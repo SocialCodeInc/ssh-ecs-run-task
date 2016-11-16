@@ -50,7 +50,7 @@ $usage
 
         -w|--workdir
         --user <user>
-        --no-rm
+		--sudo       	                             use sudo to run the docker command itself
 
 
 
@@ -62,9 +62,8 @@ $usage
 
 	SSH Options:
 		--ssh-user   <user>                          defaults to your current ssh config
-		--sudo       	                             use sudo to run the docker command
-		--ssh-o      <arg>                           passes <arg> to the ssh -o option.
-
+		--ssh-<flag>                                 passes -<flag> to the ssh command
+		--ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
 
 Example:  to start a new interactive container "like" an existing container named "nginx" in
     the nginx--staging task on the "staging" cluster, but running the "bash" command.

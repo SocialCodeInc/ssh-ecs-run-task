@@ -18,13 +18,13 @@ The first solutions that come to mind aren't much better.  No one would want to 
 
 
 # ssh-ecs-run-task
-**ssh-ecs-run-task** solves these problems for you, giving you your own **interactive **container running on an instance in your cluster by combining the power ssh, an existing Task and **your command**
+**ssh-ecs-run-task** solves these problems for you, giving you your own **interactive** container running on an instance in your cluster by combining the power ssh, an existing Task and **your command**
 
 ![ssh-run-ecs-task](images/task+command+on+ecs.medium.png)
 
-**ssh-ecs-run-task** uses ssh to give you an interative terminal session into a container running your command on an EC2 instance.  You can use this to run a django admin shell, or a mysql client, or even a bash shell.   You can start by choosing an existing TaskDefinition already defined to run on your cluster to pick the right version of the right Docker image, and copy all the environment settings, mounted volumes, containers, and **add your own command to run**
+**ssh-ecs-run-task** uses ssh to give you an interative terminal session into a container running your command on an EC2 instance.  You can use this to run a django admin shell, or a mysql client, or even a bash shell.   You can start by choosing an existing TaskDefinition already defined to run on your cluster to pick the right version of the right Docker image, and copy all the environment settings, mounted volumes, containers, and **add your own command to run**.
 
-The ssh-ecs-run-task script takes the given task; queries ECS to determine its containers, environment, volumes and image; ssh's to a randomly chosen instance in the cluster and runs the your command in a new container.
+**ssh-ecs-run-task** takes the given task; queries ECS to determine its containers, environment, volumes and image; ssh's to a randomly chosen instance in the cluster and runs the your command in a new container.
 
 For example, suppose we would like an interactive bash shell to run on our user-registration-service on the alpha cluster.  Under ECS, we already have a TaskDefinition **ecscompose-user-registration-service--alpha** to run that service, so lets use that as our starting point or template.  (Or you can create a new TaskDefinition for admin stuff)
 
@@ -41,7 +41,7 @@ For example, suppose we would like an interactive bash shell to run on our user-
 		$ echo $?
 		0
 
-Whoa – that was easy!   What just happened? The `ssh-ecs-run-task` script:
+Whoa – that was easy!   What just happened? **ssh-ecs-run-task** simply:
 
 + Guesses the cluster for ecscompose-user-registration-service--alpha to be user-registration-service--alpha. (you can override this with the **--cluster** flag if that's not correct)
 + Queries ECS to determine the task's docker image and version, environment settings, mounted volumes and list of containers
@@ -54,18 +54,18 @@ Whoa – that was easy!   What just happened? The `ssh-ecs-run-task` script:
 
 This winds up running an ssh command to run the docker container using the right image version and settings.
 
-	ssh -t user-registration-service-ecs-staging-i-9a13cd03 sudo docker run -it \
-	     --rm -e 'DATABASE_NAME=audience_profile_service' user-registration-service:1.6.0 bash
+	ssh -t user-registration-service-ecs-staging-i-9a13cd03 docker run -it \
+	     --rm -e 'DATABASE_NAME=audience_profile_service' [-e N1=V1 -e N2=V2 ...] user-registration-service:1.6.0 bash
 
 So why did `ps -ef` only show two processes?  That's because these are the only process running inside the new docker container.
 
-Also notice that the environment variables such as $DATABASE_NAME have all be defined just like they are for the ecscompose-user-registration-service--alpha task.
+Also notice that the environment variables such as $DATABASE_NAME have all been defined just like they are for the ecscompose-user-registration-service--alpha task.
 
 Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded.
 
 
 ## Usage
-The --help option will give you the full usage information.   Any options that are not recognized by ssh-ecs-run-task will be passed through to the `docker run` command
+The **--help** option will give you the full usage information.   Any options that are not recognized by `ssh-ecs-run-task` will be passed through to the `docker run` command
 
 	USAGE: ssh-ecs-run-task [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options
 	Outputs command-line options and image for use with `docker run` to run
@@ -79,6 +79,7 @@ The --help option will give you the full usage information.   Any options that a
 		should be listed before the -- command
         -w|--workdir
         --user <user>
+		--sudo                                       use sudo to run the docker command
 
 	CLUSTER Options:
 		--cluster    <cluster-name>                  cluster on which to run
@@ -88,7 +89,8 @@ The --help option will give you the full usage information.   Any options that a
 
 	SSH Options:
 		--ssh-user   <user>                          defaults to your current ssh config
-		--sudo                                       use sudo to run the docker command
+		--ssh-<flag>                                 passes -<flag> to the ssh command
+		--ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
 
 	ssh-ecs-run-task inspects the container in the task to determine its environment,
 	volumes and image, ssh's to the chosen instance and runs the command in a new container
@@ -134,7 +136,7 @@ Sometimes things go wrong.  The command you are running may get hung or you may 
 To run this script you will have to have been granted all necessary permissions.  It's not a backdoor, just an easier path to the front door.
 
 ### sudo
-On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can give users a limited set of commands to run, and logs all actions.
+On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured to give users a limited set of commands to run, and it logs all their actions.
 
 ##Caution
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
