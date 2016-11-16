@@ -26,7 +26,7 @@ The first solutions that come to mind aren't much better.  No one would want to 
 
 The ssh-ecs-run-task script takes the given task; queries ECS to determine its containers, environment, volumes and image; ssh's to a randomly chosen instance in the cluster and runs the your command in a new container.
 
-For example, suppose we would like an interactive bash shell to run on our user-registration-service on the alpha cluster.  Under ECS, we already have a TaskDefinition **ecscompose-user-registration-service--alpha** to run that service, so lets use that as our starting point or template.
+For example, suppose we would like an interactive bash shell to run on our user-registration-service on the alpha cluster.  Under ECS, we already have a TaskDefinition **ecscompose-user-registration-service--alpha** to run that service, so lets use that as our starting point or template.  (Or you can create a new TaskDefinition for admin stuff)
 
 		$ ./ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- bash
 		RUNNING bash on user-registration-service-ecs-alpha-i-fc975765
@@ -62,6 +62,7 @@ So why did `ps -ef` only show two processes?  That's because these are the only 
 Also notice that the environment variables such as $DATABASE_NAME have all be defined just like they are for the ecscompose-user-registration-service--alpha task.
 
 Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded.
+
 
 ## Usage
 The --help option will give you the full usage information.   Any options that are not recognized by ssh-ecs-run-task will be passed through to the `docker run` command
@@ -111,6 +112,14 @@ The bash command supports a handy -c 'string' option that allows you to pass a s
 
 	$ ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c '"cat /etc/hosts"'
 
+
+###Passing options to Ssh
+For long running batch commands you may want to use the **-o ServerAliveInterval=30** option to `ssh` so it will periodically tell the remote ssh server that its still alive.  You might also want to use the **-q** option to suppress extra output.  To pass options to ssh, just prefix the option with **--ssh-** like this
+
+	$ ssh-ecs-run-task --task ecscompose-user-registration-service--staging --ssh-o ServerAliveInterval=30 -- <some-long-running-command>
+
+**ssh-ecs-run-task** knows which options to ssh take arguments, and handles it all correctly
+
 ###Running Batch Commands
 Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed.
 
@@ -130,9 +139,15 @@ On some EC2 instances, you may need sudo privileges to run the docker command.  
 ##Caution
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
 
-###Proper uses:
+###Proper Uses:
 Running tasks where you want or need to see the output directly, such as a database migration
 You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`
+
++ interactive django shell
++ Jenkins builds
++ cron jobs
++ interactive mysql client
+
 ###Improper Uses:
 + Changing the configuration of the system with temporary fixes that are not factored back into chef or Github.   This is very dangerous – it can leave us with a system that works but cannot be reproduced!
 + Any unauthorized access or changes.
