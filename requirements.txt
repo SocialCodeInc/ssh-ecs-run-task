@@ -1,0 +1,2 @@
+PyYAML
+awscli>1.10.53
