@@ -63,6 +63,11 @@ Also notice that the environment variables such as $DATABASE_NAME have all been 
 
 Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded.
 
+## Installation
++ `pip install ssh-ecs-run-task`
++ or clone this git repository and run `make install-global`
+
+**ssh-ecs-run-task** requires you to pre-install ecs-cli-0.4.x or higher and the [json tool](https://github.com/trentm/json) version 9.0.3 or higher
 
 ## Usage
 The **--help** option will give you the full usage information.   Any options that are not recognized by `ssh-ecs-run-task` will be passed through to the `docker run` command
@@ -142,8 +147,7 @@ On some EC2 instances, you may need sudo privileges to run the docker command.  
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
 
 ###Proper Uses:
-Running tasks where you want or need to see the output directly, such as a database migration
-You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`
+Running tasks where you want or need to see the output directly, such as a database migration. You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`
 
 + interactive django shell
 + Jenkins builds
