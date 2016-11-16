@@ -1,33 +1,26 @@
-#
-# Use a single tag across all these images and tools to keep it SIMPLE?
-#
-# TAG = $(git describe --tags)
 
-all: sc-docker-tools
+all: ssh-ecs-run-task
 
 venv:
 	virtualenv venv
 	. venv/bin/activate && pip install -U pip wheel && pip install -r requirements.txt
 	touch venv
 
-#
-# sc-docker tools.
-#
-sc-docker-tools: venv .mk.sc-docker-tools
+ssh-ecs-run-task: venv .mk.ssh-ecs-run-task
 
-.mk.sc-docker-tools: $(shell find . -type f | egrep -v '\.git/|\.mk\.|venv/' )
+.mk.ssh-ecs-run-task: $(shell find . -type f | egrep -v '\.git/|\.mk\.|venv/' )
 	. venv/bin/activate && python setup.py bdist_wheel
-	touch .mk.sc-docker-tools
+	touch .mk.ssh-ecs-run-task
 
-install-venv: sc-docker-tools
+install-venv: ssh-ecs-run-task
 	. venv/bin/activate &&  pip install --upgrade $(shell ls -t ./dist/*.whl | head -1)
 
-install-local: sc-docker-tools
+install-local: ssh-ecs-run-task
 	pip install --upgrade $(shell ls -t ./dist/*.whl | head -1)
 
-install-global: sc-docker-tools
+install-global: ssh-ecs-run-task
 	pip install --upgrade $(shell ls -t ./dist/*.whl | head -1)
 
-test: sc-docker-tools
+test: ssh-ecs-run-task
 	echo DONE
 

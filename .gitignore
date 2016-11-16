@@ -1,0 +1,5 @@
+.mk.*
+build/
+dist/
+ssh_ecs_run_task.egg-info/
+venv/

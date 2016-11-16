@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# Print -e and -v options for use with the docker command pulling the         #
+# environment and volumes from the given container in the desired task        #
+###############################################################################
+
+#set -eou pipefail # see https://coderwall.com/p/fkfaqq/safer-bash-scripts-with-set-euxo-pipefail
+set -eo pipefail
+
+script_name=$(basename $0)
+
+ADD_ENV=true
+ADD_VOLUMES=true
+ADD_ENTRYPOINT=false
+SC_DOCKER_TOOLS_DEBUG=${SC_DOCKER_TOOLS_DEBUG:-false}
+
+CLUSTER=${CLUSTER:-}
+TASK_LIKE=${TASK_LIKE:-}
+CONTAINER=${CONTAINER:-}
+INSTANCE=${INSTANCE:-}
+SSH_USER=${SSH_USER:-}
+NO_RM=${NO_RM:-false}
+
+usage="USAGE: $script_name [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options"
+
+die() {
+    # echo $1 onto stderr and exit $2 (defaults to 1)
+    >&2 echo "$1"
+    exit_code=1
+    (($# > 1)) && exit_code=$2
+    exit $exit_code
+}
+
+help() {
+cat << EOF
+$usage
+
+	Outputs command-line options and image for use with \`docker run\` to run
+	a new container with settings from the given task.
+
+	TASK_LIKE Options:
+		+e              do NOT COPY environment variables from the Task
+		+v              do NOT COPY volumes from the Task
+
+	Docker Run Options:
+		should be listed before the -- command
+
+        -w|--workdir
+        --user <user>
+        --no-rm
+
+
+
+	CLUSTER Options:
+		--cluster    <cluster-name>                  cluster on which to run
+		--task       <task-name>                     AWS task definition name to mimic
+		--container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
+		--instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
+
+	SSH Options:
+		--ssh-user   <user>                          defaults to your current ssh config
+
+
+Example:  to start a new interactive container "like" an existing container named "nginx" in
+    the nginx--staging task on the "staging" cluster, but running the "bash" command.
+
+	\$ $script_name --task ecscompose-nginx--staging -it -- bash
+
+	might result in  \`ssh -t nginx--staging-instance-3 sudo docker run -e HOME=/home/nginx -v /secrets:/secrets -it nginx:1.6 bash \`
+	and give you an interactive shell
+
+	$script_name inspects the container in the task to determine its environment,
+	volumes and image.
+
+EOF
+exit 0
+}
+
+
+#
+# Parse options
+#
+	DOCKER_OPTIONS=(--rm)
+    while [[ ${1:-} ]]
+    do
+        case "${1:-}" in
+			-h|--help) 		help;;
+			+e)        		ADD_ENV=false; 					shift;;
+			+v)        		ADD_VOLUMES=false; 				shift;;
+			--task)         TASK_LIKE=${2};                 shift 2;;
+			--container)    CONTAINER=${2};                 shift 2;;
+			--instance)     INSTANCE=${2};                  shift 2;;
+			--cluster)      CLUSTER=${2};                   shift 2;;
+
+			# prefix all ssh options with --ssh
+			--ssh-user)     SSH_USER=${2};                  shift 2;;
+
+			--)             # end of our options and docker options
+															shift; break;;
+
+			*)              # pass all other options thru to docker
+							DOCKER_OPTIONS+=($1); 			shift;;
+		esac
+	done
+
+	# remaining args are the command and its options
+	COMMAND="$*"
+
+	[ -z "$COMMAND" ] && die "no command specified"
+	[ -z "$TASK_LIKE" ] && die "--task is a required option"
+
+	if [ -z "$CLUSTER" ]; then
+		CLUSTER=$(echo $TASK_LIKE | sed -e 's/^ecscompose-//')
+	fi
+
+	[ -z "$CLUSTER" ] && die "--cluster is a required option"
+	echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*)$" ||
+		die "Invalid cluster: $CLUSTER"
+
+	[ -z "$CONTAINER" ] && CONTAINER=0
+
+	if [ -z "$INSTANCE" ] || [[ $INSTANCE == -1 ]]; then
+		INSTANCE=0
+		shuffle() {
+			while read line;do echo "$RANDOM|$line"; done |sort|cut -d"|" -f2-
+		}
+	else
+		shuffle() {
+			cat
+		}
+	fi
+
+	$SC_DOCKER_TOOLS_DEBUG && set -x
+
+
+#
+# Get information from the task
+#
+
+	task_def=$(aws ecs describe-task-definition --task-definition $TASK_LIKE) || exit 1
+
+
+#
+# Find the container w/in the task and get information
+#
+	case $CONTAINER in
+	[0-9]*)       container=$(echo $task_def | json ".taskDefinition.containerDefinitions[$CONTAINER]");;
+	[a-zA-Z].*)   container=$(echo $task_def | json .taskDefinition.containerDefinitions |
+                              json -c "this.name == '$CONTAINER'" | json -a);;
+    *)            die "unrecognized container: $CONTAINER"
+	esac
+
+	[ -z "$container" ] && die "Could not find container: $CONTAINER"
+
+	image=$(echo $container | json .image)
+
+	[ -z "$image" ] && die "Could not find image in container $CONTAINER"
+
+#
+# Find an instance in the cluster to run on
+#
+	instance_index=0
+	instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
+	                json  .containerInstanceArns  | json -a | shuffle)
+	for container_instance_arn in $instance_arns
+	do
+		ec2InstanceId=$(aws ecs describe-container-instances --cluster $CLUSTER --container-instances $container_instance_arn |
+						 json .containerInstances | json -a .ec2InstanceId)
+		[ -n "$ec2InstanceId" ] || die "Could not find an ec2InstanceId"
+
+		ec2InstanceName=$(aws ec2 describe-instances  --instance-ids $ec2InstanceId |
+							json .Reservations | json -a .Instances | json -a .Tags |
+							json -c 'this.Key == "Name";' | json -a .Value)
+		[ -n "$ec2InstanceName" ] || die "Could not find an ec2InstanceName"
+
+		if (($instance_index == $INSTANCE)) || [[ $ec2InstanceName =~ $INSTANCE ]]; then
+			break
+		fi
+		ec2InstanceName=''
+		instance_index=$(($instance_index + 1))
+	done
+
+	[ -z "$ec2InstanceName" ] && die "Could not find instance $INSTANCE"
+
+	if $ADD_ENV; then
+		ENV_ARGS=()
+		while read env_var
+		do
+			ENV_ARGS+=(-e)
+			ENV_ARGS+=("'$env_var'")
+		done < <(echo $container | json -a .environment |
+					json -e 'this.arg = this.name + "=" + this.value;' |
+					json -a .arg)
+	fi
+
+	if $ADD_VOLUMES; then
+		VOLUME_ARGS=()
+		# invert task_volumes into a dictionary of "volume name --> sourcePath"
+		task_volumes=$(echo $task_def | json .taskDefinition.volumes |
+		               json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name" | json -a)
+		while read volume_arg
+		do
+			VOLUME_ARGS+=(-v)
+			VOLUME_ARGS+=("'$volume_arg'")
+		done < <(echo $container | json -a .mountPoints |
+					json -e "this.volumes=$task_volumes; this.volume_arg = this.containerPath + ':' + this.volumes[this.sourceVolume]" |
+					json -a .volume_arg)
+	fi
+
+
+#
+# RUN IT !!
+#
+
+	[ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
+
+	echo "RUNNING $COMMAND on ${ec2InstanceName}"
+	ssh -t ${SSH_USER_ARG}${ec2InstanceName} sudo docker run -it --rm "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"

@@ -1,3 +1,133 @@
-![ssh-run-ecs-task](https://github.com/SocialCodeInc/ssh-run-ecs-task/blob/master/ssh-esc-run-task-long.png)
-# ssh-run-ecs-task -- the interactive task runner for ECS
+![ssh-run-ecs-task -- the interactive task runner for ECS](images/ssh-esc-run-task-long.small.png)
+
+From time to time we all miss the command line prompt.  It can be frustrating when you just want to run a command and monitor its output while you wait for it to finish, but instead you wind up having to go through a series of detailed steps to find the cluster, then an instance, and run the command.
+
+Wouldn't it be nice to be able to run a command interactively, and see its output in the terminal?   Answer prompts by typing.  Just like you where there.
+ECS is great for running containers for services, but when you want to run something simple and see the output it feels impossible.
+
+The `aws ecs run-task` and `ecs-cli compose run` commands are asynchronous.  Once they start a container, its expected to run independently.  To run something interactive, you would have to make a container that waits for you attach to it, then find the instance that its running on, ssh to the instance and use `docker exec` to attach to the running container.   That's not very easy and not well suited for running ad-hoc commands.
+
+Manually running a command on ECS isn't as easy you might hope because ECS is designed to run Docker containers inside Tasks that are defined by TaskDefinitions and they write their output to a log file.   It's the exact opposite of running interactive commands.  To manually run an interactive command on ECS, you would have to first choose a cluster, then an EC2 instance inside the cluster, ssh to the instance and run commands yourself.
+
+The ssh command (secure shell) can get you to the instance, but the instance may be a bare-metal server without any of the tools or software that you need because the real business software has been built into Docker images.   Need a django admin shell with settings to connect to the database?  You'll need to start a Docker container, but not just any Docker container.  You'll have to choose an image to run, being sure to get the right version of the image for your cluster if you're on a staging or production, and you may need environment settings and even mounted volumes to give the container the information that it needs to run.
+
+That's a lot to get right, and it's definitely not easy or fast.  Even worse, if you get something wrong you could wind up connected to the wrong database or running an alpha version of your software in production.
+
+The first solutions that come to mind aren't much better.  No one would want to define a TaskDefinition for each command we want to run, then run it, check the logs .... repeat ad nuaseum.   But what if we ssh to an EC2 instance, and use `docker exec` to step inside with an interactive bash shell in one of the containers that are already running?   That will work, but it might also affect the performance of the container, or blow up its memory footprint.  And what would happen if ECS decided that the container was no longer healthy, or needed to be stopped for other reasons.  Our work could get cut off in mid-sentence.
+
+
+
+# ssh-ecs-run-task
+**ssh-ecs-run-task** solves these problems for you, giving you your own **interactive **container running on an instance in your cluster by combining the power ssh, an existing Task and **your command**
+
+![ssh-run-ecs-task](images/task+command+on+ecs.medium.png)
+
+**ssh-ecs-run-task** uses ssh to give you an interative terminal session into a container running your command on an EC2 instance.  You can use this to run a django admin shell, or a mysql client, or even a bash shell.   You can start by choosing an existing TaskDefinition already defined to run on your cluster to pick the right version of the right Docker image, and copy all the environment settings, mounted volumes, containers, and **add your own command to run**
+
+The ssh-ecs-run-task script takes the given task; queries ECS to determine its containers, environment, volumes and image; ssh's to a randomly chosen instance in the cluster and runs the your command in a new container.
+
+For example, suppose we would like an interactive bash shell to run on our user-registration-service on the alpha cluster.  Under ECS, we already have a TaskDefinition **ecscompose-user-registration-service--alpha** to run that service, so lets use that as our starting point or template.
+
+		$ ./ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- bash
+		RUNNING bash on user-registration-service-ecs-alpha-i-fc975765
+		# ps -ef
+		PID TTY TIME CMD
+		1 ? 00:00:00 bash
+		2 ? 00:00:00 ps -ef
+		#
+		# echo "DATABASE_NAME=$DATABASE_NAME"
+		DATABASE_NAME=use-registration-db--alpha
+		# exit 
+		$ echo $?
+		0
+
+Whoa – that was easy!   What just happened? The `ssh-ecs-run-task` script:
+
++ Guesses the cluster for ecscompose-user-registration-service--alpha to be user-registration-service--alpha. (you can override this with the **--cluster** flag if that's not correct)
++ Queries ECS to determine the task's docker image and version, environment settings, mounted volumes and list of containers
++ Chooses the first container (you can override this with the **--container N** or **--container \<name >** option)
++ Queries ECS to choose a random instance from the cluster (you can override this with **--instance N** or **--instance \<pattern>**)
++ Formulates an ssh command to run as yourself (or **--ssh-user \<user-name>**) on the chosen instance, to run a remote docker command passing **-e VAR=VAL** and **-v VOLUME**, image and your command as arguments to `docker run`
++ Runs the ssh command giving you a terminal and a prompt if the command is interactive.
++ Stays connected until the command completes or you type **^C** to interrupt it.
++ Cleans up the processes, removes the container, and terminates the ssh connection.
+
+So why did `ps -ef` only show two processes?  That's because these are the only process running inside the new docker container.
+
+Also notice that the environment variables such as $DB_NAME have all be defined just like they are for the ecscompose-user-registration-service--alpha task.
+
+Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded. 
+
+## Usage
+The --help option will give you the full usage information.   Any options that are not recognized by ssh-ecs-run-task will be passed through to the `docker run` command
+
+	USAGE: ssh-ecs-run-task [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options
+	Outputs command-line options and image for use with `docker run` to run
+	a new container with settings from the given task.
+
+	TASK_LIKE Options:
+		+e              do NOT COPY environment variables from the Task
+		+v              do NOT COPY volumes from the Task
+
+	Docker Run Options:
+		should be listed before the -- command
+        -w|--workdir
+        --user <user>
+
+	CLUSTER Options:
+		--cluster    <cluster-name>                  cluster on which to run
+		--task       <task-name>                     AWS task definition name to mimic
+		--container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
+		--instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
+
+	SSH Options:
+		--ssh-user   <user>                          defaults to your current ssh config
+
+	ssh-ecs-run-task inspects the container in the task to determine its environment,
+	volumes and image, ssh's to the chosen instance and runs the command in a new container
+
+##Examples
++ Run a bash shell inside a container.  `ssh-ecs-run-task --task ecscompose-user-registration-service--alpha – bash`
++ Print the environment.  `ssh-ecs-run-task --task ecscompose-user-registration-service--alpha – /usr/bin/env`
++ Check connectivity from inside the container.  ` ssh-ecs-run-task --task ecscompose-user-registration-service--alpha – ping -c 5 google.com`
++ One-Shot admin commands such as  `./ssh-ecs-run-task --task ecscompose-user-registration-service--production -- django-admin user_brand_grant 3000486 4628`
+
+###Passing flags to `docker run` and the command
+Everything (including flags) after the special `–` double dash separator is part of the command to run.  Everything before the double dash is treated as either a recognized option for ssh-ecs-run-task, or an option to `docker run`.
+
+	$ ssh-ecs-run-task --task ecscompose-user-registration-service--staging --user nobody  --entrypoint bash --instance fc975765 -- -c id -a
+	uid=65534(nobody) gid=65534(nogroup) groups=65534(nogroup)
+
+In the above example, the **--task** option is used supply a task name to `ssh-ecs-run-task`,  the **--entrypoint** and **--user** options pass through to the `docker run` command to set the entrypoint to **bash** and the user to **nobody**.  After the double dash **--**,  the -c option is processed by the bash shell to say "here are some bash commands", and then running `id -a` inside the container, showing the effects of the --user flag.
+
+###Passing Quoted Arguments to the Command
+The bash command supports a handy -c 'string' option that allows you to pass a short script to run in the form of a string.  But ssh likes to eat white space so, if you run the command ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c 'cat /etc/hosts' will actually run `cat` instead of `cat /etc/hosts`.    To avoid this problem, simply enclose double quoted strings with single quotes like this: 
+
+	$ ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c '"cat /etc/hosts"'
+
+###Running Batch Commands
+Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed. 
+ 
++ **exit codes** --  If the command failed, **ssh-ecs-run-task** will exit with the same exit code.
++ **stdout & stderr** -- **shh-ecs-run-task** will capture the stdout and stderr from your command and write it to the same channels on your shell.  So you can redirect stdout or stderr to a file or whereever you choose.
+
+
+###Stopping a Container
+Sometimes things go wrong.  The command you are running may get hung or you may realize that you've run the wrong command, (like  `rm -rf foo /*` instead of `rm -rf foo/*`).  If your container uses (dockerfy)[https://github.com/SocialCodeInc/dockerfy] as its entrypoint, then when you type the ^C aka <ccontrol>C character or kill your ssh,  dockerfy will catch the SIGINT, SIGQUIT, SIGTERM, SIGHUP and shutdown the container.   Without dockerfy, some commands just hang.   How your command reacts depends on how well it handles signals through ssh and docker.   So using dockerfy as the entrypoint is highly recommended.  With dockerfy as the entrypoint, dockerfy runs your command, and listens for signals (which will propagate to your command), and the container will get cleanly shutdown when your command finishes.
+
+##Permissions
+To run this script you will have to have been granted all necessary permissions.  It's not a backdoor, just an easier path to the front door.
+
+##Caution
+As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.  
+
+###Proper uses:
+Running tasks where you want or need to see the output directly, such as a database migration
+You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`
+###Improper Uses:
++ Changing the configuration of the system with temporary fixes that are not factored back into chef or Github.   This is very dangerous – it can leave us with a system that works but cannot be reproduced!
++ Any unauthorized access or changes.
++ Relying on this command instead of actually designing your system to have a proper management features.
+
+**ssh-ecs-run-task** is a handy tool for running 
 

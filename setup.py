@@ -56,7 +56,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
 if __name__ == '__main__':
     print('Running setup.py for ssh-ecs-run-task version %s'
           % VERSION)
-    verify_dependency('ecs-cli', '0.4', '-with--cluster-flag')
+    verify_dependency('ecs-cli', '0.4')
     verify_dependency('json', '9.0')
 
 
