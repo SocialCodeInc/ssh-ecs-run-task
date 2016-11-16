@@ -37,7 +37,7 @@ For example, suppose we would like an interactive bash shell to run on our user-
 		#
 		# echo "DATABASE_NAME=$DATABASE_NAME"
 		DATABASE_NAME=use-registration-db--alpha
-		# exit 
+		# exit
 		$ echo $?
 		0
 
@@ -52,11 +52,16 @@ Whoa – that was easy!   What just happened? The `ssh-ecs-run-task` script:
 + Stays connected until the command completes or you type **^C** to interrupt it.
 + Cleans up the processes, removes the container, and terminates the ssh connection.
 
+This winds up running an ssh command to run the docker container using the right image version and settings.
+
+	ssh -t user-registration-service-ecs-staging-i-9a13cd03 sudo docker run -it \
+	     --rm -e 'DATABASE_NAME=audience_profile_service' user-registration-service:1.6.0 bash
+
 So why did `ps -ef` only show two processes?  That's because these are the only process running inside the new docker container.
 
-Also notice that the environment variables such as $DB_NAME have all be defined just like they are for the ecscompose-user-registration-service--alpha task.
+Also notice that the environment variables such as $DATABASE_NAME have all be defined just like they are for the ecscompose-user-registration-service--alpha task.
 
-Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded. 
+Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded.
 
 ## Usage
 The --help option will give you the full usage information.   Any options that are not recognized by ssh-ecs-run-task will be passed through to the `docker run` command
@@ -82,6 +87,7 @@ The --help option will give you the full usage information.   Any options that a
 
 	SSH Options:
 		--ssh-user   <user>                          defaults to your current ssh config
+		--sudo                                       use sudo to run the docker command
 
 	ssh-ecs-run-task inspects the container in the task to determine its environment,
 	volumes and image, ssh's to the chosen instance and runs the command in a new container
@@ -101,13 +107,13 @@ Everything (including flags) after the special `–` double dash separator is pa
 In the above example, the **--task** option is used supply a task name to `ssh-ecs-run-task`,  the **--entrypoint** and **--user** options pass through to the `docker run` command to set the entrypoint to **bash** and the user to **nobody**.  After the double dash **--**,  the -c option is processed by the bash shell to say "here are some bash commands", and then running `id -a` inside the container, showing the effects of the --user flag.
 
 ###Passing Quoted Arguments to the Command
-The bash command supports a handy -c 'string' option that allows you to pass a short script to run in the form of a string.  But ssh likes to eat white space so, if you run the command ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c 'cat /etc/hosts' will actually run `cat` instead of `cat /etc/hosts`.    To avoid this problem, simply enclose double quoted strings with single quotes like this: 
+The bash command supports a handy -c 'string' option that allows you to pass a short script to run in the form of a string.  But ssh likes to eat white space so, if you run the command ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c 'cat /etc/hosts' will actually run `cat` instead of `cat /etc/hosts`.    To avoid this problem, simply enclose double quoted strings with single quotes like this:
 
 	$ ssh user-registration-service-ecs-staging-i-9a13cd03 bash -c '"cat /etc/hosts"'
 
 ###Running Batch Commands
-Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed. 
- 
+Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed.
+
 + **exit codes** --  If the command failed, **ssh-ecs-run-task** will exit with the same exit code.
 + **stdout & stderr** -- **shh-ecs-run-task** will capture the stdout and stderr from your command and write it to the same channels on your shell.  So you can redirect stdout or stderr to a file or whereever you choose.
 
@@ -118,8 +124,11 @@ Sometimes things go wrong.  The command you are running may get hung or you may 
 ##Permissions
 To run this script you will have to have been granted all necessary permissions.  It's not a backdoor, just an easier path to the front door.
 
+### sudo
+On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can give users a limited set of commands to run, and logs all actions.
+
 ##Caution
-As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.  
+As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
 
 ###Proper uses:
 Running tasks where you want or need to see the output directly, such as a database migration
@@ -129,5 +138,5 @@ You could use even this script to create an interactive django shell to perform 
 + Any unauthorized access or changes.
 + Relying on this command instead of actually designing your system to have a proper management features.
 
-**ssh-ecs-run-task** is a handy tool for running 
+**ssh-ecs-run-task** is a handy tool for running
 

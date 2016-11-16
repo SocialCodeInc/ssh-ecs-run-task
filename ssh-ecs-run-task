@@ -20,7 +20,7 @@ TASK_LIKE=${TASK_LIKE:-}
 CONTAINER=${CONTAINER:-}
 INSTANCE=${INSTANCE:-}
 SSH_USER=${SSH_USER:-}
-NO_RM=${NO_RM:-false}
+SUDO=${SUDO:-false}
 
 usage="USAGE: $script_name [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options"
 
@@ -60,6 +60,7 @@ $usage
 
 	SSH Options:
 		--ssh-user   <user>                          defaults to your current ssh config
+		--sudo       	                             use sudo to run the docker command
 
 
 Example:  to start a new interactive container "like" an existing container named "nginx" in
@@ -88,6 +89,7 @@ exit 0
 			-h|--help) 		help;;
 			+e)        		ADD_ENV=false; 					shift;;
 			+v)        		ADD_VOLUMES=false; 				shift;;
+			--sudo)     	SUDO=true;					    shift;;
 			--task)         TASK_LIKE=${2};                 shift 2;;
 			--container)    CONTAINER=${2};                 shift 2;;
 			--instance)     INSTANCE=${2};                  shift 2;;
@@ -214,6 +216,7 @@ exit 0
 #
 
 	[ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
+	$SUDO && SUDO_ARG=sudo
 
 	echo "RUNNING $COMMAND on ${ec2InstanceName}"
-	ssh -t ${SSH_USER_ARG}${ec2InstanceName} sudo docker run -it --rm "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+	ssh -t ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
