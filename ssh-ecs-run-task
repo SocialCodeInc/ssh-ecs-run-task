@@ -212,6 +212,7 @@ exit 0
 		# invert task_volumes into a dictionary of "volume name --> sourcePath"
 		task_volumes=$(echo $task_def | json .taskDefinition.volumes |
 		               json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name" | json -a)
+		[ -z "$task_volumes" ]  && task_volumes='{}'
 		while read volume_arg
 		do
 			VOLUME_ARGS+=(-v)
