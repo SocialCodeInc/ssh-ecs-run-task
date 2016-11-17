@@ -13,6 +13,7 @@ script_name=$(basename $0)
 ADD_ENV=true
 ADD_VOLUMES=true
 ADD_ENTRYPOINT=false
+OVERRIDING_ENTRYPOINT=false
 SC_DOCKER_TOOLS_DEBUG=${SC_DOCKER_TOOLS_DEBUG:-false}
 
 CLUSTER=${CLUSTER:-}
@@ -103,11 +104,17 @@ exit 0
 			--ssh-[1246AaCfGgKkMNnqsTtVvXxYy])
 							# ssh options that take no arguments
 							ssh_option=$(echo $1 | sed 's/--ssh-//')
-							SSH_ARGS+=(-$ssh_option);        shift;;
+							SSH_ARGS+=(-$ssh_option);       shift;;
 
 			--ssh-*)        # ssh options that take an argument
 							ssh_option=$(echo $1 | sed 's/--ssh-//')
 							SSH_ARGS+=(-$ssh_option ${2});  shift 2;;
+
+			--entrypoint)
+							# Note the fact that the entrypoint is
+							# being overridden and pass it thru to docker
+							OVERRIDING_ENTRYPOINT=true
+							DOCKER_OPTIONS+=($1);           shift;;
 
 			--)             # end of our options and docker options
 															shift; break;;
@@ -120,7 +127,7 @@ exit 0
 	# remaining args are the command and its options
 	COMMAND="$*"
 
-	[ -z "$COMMAND" ] && die "no command specified"
+	[ -n "$COMMAND" ] || $OVERRIDING_ENTRYPOINT || die "no command specified"
 	[ -z "$TASK_LIKE" ] && die "--task is a required option"
 
 	if [ -z "$CLUSTER" ]; then
@@ -176,6 +183,14 @@ exit 0
 	instance_index=0
 	instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
 	                json  .containerInstanceArns  | json -a | shuffle)
+	if [ -z "$instance_arns" ]; then
+		if aws ecs list-clusters | json .clusterArns | json -a | egrep -q ".*:cluster/${CLUSTER}$"; then
+			die "Cluster '$CLUSTER' has no instances"
+		else
+			die "Invalid cluster: $CLUSTER"
+		fi
+	fi
+
 	for container_instance_arn in $instance_arns
 	do
 		ec2InstanceId=$(aws ecs describe-container-instances --cluster $CLUSTER --container-instances $container_instance_arn |

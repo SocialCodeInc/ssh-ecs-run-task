@@ -133,6 +133,10 @@ Batch commands that never prompt for input, will run to completion and **ssh-ecs
 + **exit codes** --  If the command failed, **ssh-ecs-run-task** will exit with the same exit code.
 + **stdout & stderr** -- **shh-ecs-run-task** will capture the stdout and stderr from your command and write it to the same channels on your shell.  So you can redirect stdout or stderr to a file or whereever you choose.
 
+You may find these ssh options useful for running batch commands, to avoid some prompts, verbose output, and timeouts
+
+   	$ ssh-ecs-run-task --ssh-q --ssh-o StrictHostKeyChecking=no --ssh-o ServerAliveInterval=30 --task <task-name>
+
 
 ###Stopping a Container
 Sometimes things go wrong.  The command you are running may get hung or you may realize that you've run the wrong command, (like  `rm -rf foo /*` instead of `rm -rf foo/*`).  If your container uses (dockerfy)[https://github.com/SocialCodeInc/dockerfy] as its entrypoint, then when you type the ^C aka <ccontrol>C character or kill your ssh,  dockerfy will catch the SIGINT, SIGQUIT, SIGTERM, SIGHUP and shutdown the container.   Without dockerfy, some commands just hang.   How your command reacts depends on how well it handles signals through ssh and docker.   So using dockerfy as the entrypoint is highly recommended.  With dockerfy as the entrypoint, dockerfy runs your command, and listens for signals (which will propagate to your command), and the container will get cleanly shutdown when your command finishes.
@@ -159,5 +163,20 @@ Running tasks where you want or need to see the output directly, such as a datab
 + Any unauthorized access or changes.
 + Relying on this command instead of actually designing your system to have a proper management features.
 
-**ssh-ecs-run-task** is a handy tool for running
+## Limitations
+### Running images from private dockerhub repository on a foreign cluster
 
+Accessing a private Dockerhub repository requires Oauth authentication for the docker
+command, which beyond the scope of **ssh-ecs-run-task's** capabilities.
+
+This means that any images from private Dockerhub repositories must already exist on the cluster.  In this case, you may want to build any support software into an image that will always be used by a running container for your cluster instances.
+
+The typical error message will not tell you that this is an authentication issue, instead it will complain that the image is "not found"
+
+   	$ ssh-ecs-run-task --ssh-q --ssh-o StrictHostKeyChecking=no --ssh-o ServerAliveInterval=30 --task ecscompose-user-blogs--staging \
+      --cluster user-registration-service--staging --entrypoint bash
+
+	RUNNING  on user-registration-service-ecs-staging-i-9a13cd03
+	Unable to find image 'myorganization/user-blogs:2.3.1' locally
+	Pulling repository docker.io/myorganization/user-blogs
+	docker: Error: image smyorganization/user-blogs not found.
