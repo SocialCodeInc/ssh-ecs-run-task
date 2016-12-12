@@ -42,49 +42,49 @@ help() {
 cat << EOF
 $usage
 
-	Outputs command-line options and image for use with \`docker run\` to run
-	a new container with settings from the given task.
+    Outputs command-line options and image for use with \`docker run\` to run
+    a new container with settings from the given task.
 
-	General Options:
-		--verbose 		print verbose output 
-		--debug         print debug output
+    General Options:
+        --verbose       print verbose output 
+        --debug         print debug output
 
-	TASK_LIKE Options:
-		+e                   	do NOT COPY environment variables from the Task
-		+v              		do NOT COPY volumes from the Task
-		--image <image>         use given image for the task
+    TASK_LIKE Options:
+        +e                      do NOT COPY environment variables from the Task
+        +v                      do NOT COPY volumes from the Task
+        --image <image>         use given image for the task
 
 
-	Docker Run Options:
-		should be listed before the -- command
+    Docker Run Options:
+        should be listed before the -- command
 
         -w|--workdir
         --user <user>
-		--sudo       	                             use sudo to run the docker command itself
+        --sudo                                        use sudo to run the docker command itself
 
 
 
-	CLUSTER Options:
-		--cluster    <cluster-name>                  cluster on which to run
-		--task       <task-name>                     AWS task definition name to mimic
-		--container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
-		--instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
+    CLUSTER Options:
+        --cluster    <cluster-name>                  cluster on which to run
+        --task       <task-name>                     AWS task definition name to mimic
+        --container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
+        --instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
 
-	SSH Options:
-		--ssh-user   <user>                          defaults to your current ssh config
-		--ssh-<flag>                                 passes -<flag> to the ssh command
-		--ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
+    SSH Options:
+        --ssh-user   <user>                          defaults to your current ssh config
+        --ssh-<flag>                                 passes -<flag> to the ssh command
+        --ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
 
 Example:  to start a new interactive container "like" an existing container named "nginx" in
     the nginx--staging task on the "staging" cluster, but running the "bash" command.
 
-	\$ $script_name --task ecscompose-nginx--staging -it -- bash
+    \$ $script_name --task ecscompose-nginx--staging -it -- bash
 
-	might result in  \`ssh -t nginx--staging-instance-3 sudo docker run -e HOME=/home/nginx -v /secrets:/secrets -it nginx:1.6 bash \`
-	and give you an interactive shell
+    might result in  \`ssh -t nginx--staging-instance-3 sudo docker run -e HOME=/home/nginx -v /secrets:/secrets -it nginx:1.6 bash \`
+    and give you an interactive shell
 
-	$script_name inspects the container in the task to determine its environment,
-	volumes and image.
+    $script_name inspects the container in the task to determine its environment,
+    volumes and image.
 
 EOF
 exit 0
@@ -94,172 +94,172 @@ exit 0
 #
 # Parse options
 #
-	DOCKER_OPTIONS=(--rm)
+    DOCKER_OPTIONS=(--rm)
     while [[ ${1:-} ]]
     do
         case "${1:-}" in
-			-h|--help) 		help;;
-			+e)        		ADD_ENV=false; 					shift;;
-			+v)        		ADD_VOLUMES=false; 				shift;;
-			--verbose)      VERBOSE=true;                   shift;;
-			--debug)        SC_DOCKER_TOOLS_DEBUG=true 
-							set -x;                         shift;;
-			--sudo)     	SUDO=true;					    shift;;
-			--task)         TASK_LIKE=${2};                 shift 2;;
-			--image)        IMAGE=${2};          			shift 2;;
-			--container)    CONTAINER=${2};                 shift 2;;
-			--instance)     INSTANCE=${2};                  shift 2;;
-			--cluster)      CLUSTER=${2};                   shift 2;;
+            -h|--help)      help;;
+            +e)             ADD_ENV=false;                     shift;;
+            +v)             ADD_VOLUMES=false;                 shift;;
+            --verbose)      VERBOSE=true;                      shift;;
+            --debug)        SC_DOCKER_TOOLS_DEBUG=true 
+                            set -x;                            shift;;
+            --sudo)         SUDO=true;                         shift;;
+            --task)         TASK_LIKE=${2};                    shift 2;;
+            --image)        IMAGE=${2};                        shift 2;;
+            --container)    CONTAINER=${2};                    shift 2;;
+            --instance)     INSTANCE=${2};                     shift 2;;
+            --cluster)      CLUSTER=${2};                      shift 2;;
 
-			# prefix all ssh options with --ssh
-			--ssh-user)     SSH_USER=${2};                  shift 2;;
+            # prefix all ssh options with --ssh
+            --ssh-user)     SSH_USER=${2};                     shift 2;;
 
-			--ssh-[1246AaCfGgKkMNnqsTtVvXxYy])
-							# ssh options that take no arguments
-							ssh_option=$(echo $1 | sed 's/--ssh-//')
-							SSH_ARGS+=(-$ssh_option);       shift;;
+            --ssh-[1246AaCfGgKkMNnqsTtVvXxYy])
+                            # ssh options that take no arguments
+                            ssh_option=$(echo $1 | sed 's/--ssh-//')
+                            SSH_ARGS+=(-$ssh_option);          shift;;
 
-			--ssh-*)        # ssh options that take an argument
-							ssh_option=$(echo $1 | sed 's/--ssh-//')
-							SSH_ARGS+=(-$ssh_option ${2});  shift 2;;
+            --ssh-*)        # ssh options that take an argument
+                            ssh_option=$(echo $1 | sed 's/--ssh-//')
+                            SSH_ARGS+=(-$ssh_option ${2});     shift 2;;
 
-			--entrypoint)
-							# Note the fact that the entrypoint is
-							# being overridden and pass it thru to docker
-							OVERRIDING_ENTRYPOINT=true
-							DOCKER_OPTIONS+=($1);           shift;;
+            --entrypoint)
+                            # Note the fact that the entrypoint is
+                            # being overridden and pass it thru to docker
+                            OVERRIDING_ENTRYPOINT=true
+                            DOCKER_OPTIONS+=($1);              shift;;
 
-			--)             # end of our options and docker options
-															shift; break;;
+            --)             # end of our options and docker options
+                                                               shift; break;;
 
-			*)              # pass all other options thru to docker
-							DOCKER_OPTIONS+=($1); 			shift;;
-		esac
-	done
+            *)              # pass all other options thru to docker
+                            DOCKER_OPTIONS+=($1);              shift;;
+        esac
+    done
 
-	# remaining args are the command and its options
-	COMMAND="$*"
+    # remaining args are the command and its options
+    COMMAND="$*"
 
-	[ -n "$COMMAND" ] || $OVERRIDING_ENTRYPOINT || die "no command specified"
-	[ -z "$TASK_LIKE" ] && die "--task is a required option"
+    [ -n "$COMMAND" ] || $OVERRIDING_ENTRYPOINT || die "no command specified"
+    [ -z "$TASK_LIKE" ] && die "--task is a required option"
 
-	if [ -z "$CLUSTER" ]; then
-		CLUSTER=$(echo $TASK_LIKE | sed -e 's/^ecscompose-//')
-	fi
+    if [ -z "$CLUSTER" ]; then
+        CLUSTER=$(echo $TASK_LIKE | sed -e 's/^ecscompose-//')
+    fi
 
-	[ -z "$CLUSTER" ] && die "--cluster is a required option"
-	echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*)$" ||
-		die "Invalid cluster: $CLUSTER"
+    [ -z "$CLUSTER" ] && die "--cluster is a required option"
+    echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*)$" ||
+        die "Invalid cluster: $CLUSTER"
 
-	[ -z "$CONTAINER" ] && CONTAINER=0
+    [ -z "$CONTAINER" ] && CONTAINER=0
 
-	if [ -z "$INSTANCE" ] || [[ $INSTANCE == -1 ]]; then
-		INSTANCE=0
-		shuffle() {
-			while read line;do echo "$RANDOM|$line"; done |sort|cut -d"|" -f2-
-		}
-	else
-		shuffle() {
-			cat
-		}
-	fi
+    if [ -z "$INSTANCE" ] || [[ $INSTANCE == -1 ]]; then
+        INSTANCE=0
+        shuffle() {
+            while read line;do echo "$RANDOM|$line"; done |sort|cut -d"|" -f2-
+        }
+    else
+        shuffle() {
+            cat
+        }
+    fi
 
-	$SC_DOCKER_TOOLS_DEBUG && set -x
+    $SC_DOCKER_TOOLS_DEBUG && set -x
 
 
 #
 # Get information from the task
 #
 
-	task_def=$(aws ecs describe-task-definition --task-definition $TASK_LIKE) || exit 1
+    task_def=$(aws ecs describe-task-definition --task-definition $TASK_LIKE) || exit 1
 
 
 #
 # Find the container w/in the task and get information
 #
-	case $CONTAINER in
-	[0-9]*)       container=$(echo $task_def | json ".taskDefinition.containerDefinitions[$CONTAINER]");;
-	[a-zA-Z].*)   container=$(echo $task_def | json .taskDefinition.containerDefinitions |
+    case $CONTAINER in
+    [0-9]*)       container=$(echo $task_def | json ".taskDefinition.containerDefinitions[$CONTAINER]");;
+    [a-zA-Z].*)   container=$(echo $task_def | json .taskDefinition.containerDefinitions |
                               json -c "this.name == '$CONTAINER'" | json -a);;
     *)            die "unrecognized container: $CONTAINER"
-	esac
+    esac
 
-	[ -z "$container" ] && die "Could not find container: $CONTAINER"
+    [ -z "$container" ] && die "Could not find container: $CONTAINER"
 
-	image=${IMAGE:-$(echo $container | json .image)}
+    image=${IMAGE:-$(echo $container | json .image)}
 
-	[ -z "$image" ] && die "Could not find image in container $CONTAINER"
+    [ -z "$image" ] && die "Could not find image in container $CONTAINER"
 
 #
 # Find an instance in the cluster to run on
 #
-	instance_index=0
-	instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
-	                json  .containerInstanceArns  | json -a | shuffle)
-	if [ -z "$instance_arns" ]; then
-		if aws ecs list-clusters | json .clusterArns | json -a | egrep -q ".*:cluster/${CLUSTER}$"; then
-			die "Cluster '$CLUSTER' has no instances"
-		else
-			die "Invalid cluster: $CLUSTER"
-		fi
-	fi
+    instance_index=0
+    instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
+                      json  .containerInstanceArns  | json -a | shuffle)
+    if [ -z "$instance_arns" ]; then
+        if aws ecs list-clusters | json .clusterArns | json -a | egrep -q ".*:cluster/${CLUSTER}$"; then
+            die "Cluster '$CLUSTER' has no instances"
+        else
+            die "Invalid cluster: $CLUSTER"
+        fi
+    fi
 
-	for container_instance_arn in $instance_arns
-	do
-		ec2InstanceId=$(aws ecs describe-container-instances --cluster $CLUSTER --container-instances $container_instance_arn |
-						 json .containerInstances | json -a .ec2InstanceId)
-		[ -n "$ec2InstanceId" ] || die "Could not find an ec2InstanceId"
+    for container_instance_arn in $instance_arns
+    do
+        ec2InstanceId=$(aws ecs describe-container-instances --cluster $CLUSTER --container-instances $container_instance_arn |
+                          json .containerInstances | json -a .ec2InstanceId)
+        [ -n "$ec2InstanceId" ] || die "Could not find an ec2InstanceId"
 
-		ec2InstanceName=$(aws ec2 describe-instances  --instance-ids $ec2InstanceId |
-							json .Reservations | json -a .Instances | json -a .Tags |
-							json -c 'this.Key == "Name";' | json -a .Value)
-		[ -n "$ec2InstanceName" ] || die "Could not find an ec2InstanceName"
+        ec2InstanceName=$(aws ec2 describe-instances  --instance-ids $ec2InstanceId |
+                            json .Reservations | json -a .Instances | json -a .Tags |
+                            json -c 'this.Key == "Name";' | json -a .Value)
+        [ -n "$ec2InstanceName" ] || die "Could not find an ec2InstanceName"
 
-		if (($instance_index == $INSTANCE)) 2>/dev/null || [[ $ec2InstanceName =~ $INSTANCE ]]; then
-			break
-		fi
-		ec2InstanceName=''
-		instance_index=$(($instance_index + 1))
-	done
+        if (($instance_index == $INSTANCE)) 2>/dev/null || [[ $ec2InstanceName =~ $INSTANCE ]]; then
+            break
+        fi
+        ec2InstanceName=''
+        instance_index=$(($instance_index + 1))
+    done
 
-	[ -z "$ec2InstanceName" ] && die "Could not find instance $INSTANCE"
+    [ -z "$ec2InstanceName" ] && die "Could not find instance $INSTANCE"
 
-	if $ADD_ENV; then
-		ENV_ARGS=()
-		while read env_var
-		do
-			ENV_ARGS+=(-e)
-			ENV_ARGS+=("'$env_var'")
-		done < <(echo $container | json -a .environment |
-					json -e 'this.arg = this.name + "=" + this.value;' |
-					json -a .arg)
-	fi
+    if $ADD_ENV; then
+        ENV_ARGS=()
+        while read env_var
+        do
+            ENV_ARGS+=(-e)
+            ENV_ARGS+=("'$env_var'")
+        done < <(echo $container | json -a .environment |
+                    json -e 'this.arg = this.name + "=" + this.value;' |
+                    json -a .arg)
+    fi
 
-	if $ADD_VOLUMES; then
-		VOLUME_ARGS=()
-		# invert task_volumes into a dictionary of "volume name --> sourcePath"
-		task_volumes=$(echo $task_def | json .taskDefinition.volumes |
-		               json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name" | json -a)
-		[ -z "$task_volumes" ]  && task_volumes='{}'
-		while read volume_arg
-		do
-			VOLUME_ARGS+=(-v)
-			VOLUME_ARGS+=("'$volume_arg'")
-		done < <(echo $container | json -a .mountPoints |
-					json -e "this.volumes=$task_volumes; this.volume_arg = this.containerPath + ':' + this.volumes[this.sourceVolume]" |
-					json -a .volume_arg)
-	fi
+    if $ADD_VOLUMES; then
+        VOLUME_ARGS=()
+        # invert task_volumes into a dictionary of "volume name --> sourcePath"
+        task_volumes=$(echo $task_def | json .taskDefinition.volumes |
+                       json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name" | json -a)
+        [ -z "$task_volumes" ]  && task_volumes='{}'
+        while read volume_arg
+        do
+            VOLUME_ARGS+=(-v)
+            VOLUME_ARGS+=("'$volume_arg'")
+        done < <(echo $container | json -a .mountPoints |
+                    json -e "this.volumes=$task_volumes; this.volume_arg = this.containerPath + ':' + this.volumes[this.sourceVolume]" |
+                    json -a .volume_arg)
+    fi
 
 
 #
 # RUN IT !!
 #
 
-	[ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
-	$SUDO && SUDO_ARG=sudo
+    [ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
+    $SUDO && SUDO_ARG=sudo
 
-	echo "RUNNING $COMMAND on ${ec2InstanceName}"
-	if ${VERBOSE}; then
-		echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
-	fi
-	ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+    echo "RUNNING $COMMAND on ${ec2InstanceName}"
+    if ${VERBOSE}; then
+        echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+    fi
+    ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
