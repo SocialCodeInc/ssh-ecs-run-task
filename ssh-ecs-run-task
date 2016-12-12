@@ -10,11 +10,13 @@ set -eo pipefail
 
 script_name=$(basename $0)
 
+VERBOSE=false
 ADD_ENV=true
 ADD_VOLUMES=true
 ADD_ENTRYPOINT=false
 OVERRIDING_ENTRYPOINT=false
 SC_DOCKER_TOOLS_DEBUG=${SC_DOCKER_TOOLS_DEBUG:-false}
+OVERRIDDEN_IMAGE=''
 
 CLUSTER=${CLUSTER:-}
 TASK_LIKE=${TASK_LIKE:-}
@@ -42,9 +44,15 @@ $usage
 	Outputs command-line options and image for use with \`docker run\` to run
 	a new container with settings from the given task.
 
+	General Options:
+		--verbose 		print verbose output 
+		--debug         print debug output
+
 	TASK_LIKE Options:
-		+e              do NOT COPY environment variables from the Task
-		+v              do NOT COPY volumes from the Task
+		+e                   	do NOT COPY environment variables from the Task
+		+v              		do NOT COPY volumes from the Task
+		--image <image>         use given image for the task
+
 
 	Docker Run Options:
 		should be listed before the -- command
@@ -92,8 +100,12 @@ exit 0
 			-h|--help) 		help;;
 			+e)        		ADD_ENV=false; 					shift;;
 			+v)        		ADD_VOLUMES=false; 				shift;;
+			--verbose)      VERBOSE=true;                   shift;;
+			--debug)        SC_DOCKER_TOOLS_DEBUG=true 
+							set -x;                         shift;;
 			--sudo)     	SUDO=true;					    shift;;
 			--task)         TASK_LIKE=${2};                 shift 2;;
+			--image)        OVERRIDDEN_IMAGE=${2};          shift 2;;
 			--container)    CONTAINER=${2};                 shift 2;;
 			--instance)     INSTANCE=${2};                  shift 2;;
 			--cluster)      CLUSTER=${2};                   shift 2;;
@@ -173,7 +185,7 @@ exit 0
 
 	[ -z "$container" ] && die "Could not find container: $CONTAINER"
 
-	image=$(echo $container | json .image)
+	image=${OVERRIDDEN_IMAGE:-$(echo $container | json .image)}
 
 	[ -z "$image" ] && die "Could not find image in container $CONTAINER"
 
@@ -202,7 +214,7 @@ exit 0
 							json -c 'this.Key == "Name";' | json -a .Value)
 		[ -n "$ec2InstanceName" ] || die "Could not find an ec2InstanceName"
 
-		if (($instance_index == $INSTANCE)) || [[ $ec2InstanceName =~ $INSTANCE ]]; then
+		if (($instance_index == $INSTANCE)) 2>/dev/null || [[ $ec2InstanceName =~ $INSTANCE ]]; then
 			break
 		fi
 		ec2InstanceName=''
@@ -246,4 +258,7 @@ exit 0
 	$SUDO && SUDO_ARG=sudo
 
 	echo "RUNNING $COMMAND on ${ec2InstanceName}"
+	if ${VERBOSE}; then
+		echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+	fi
 	ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
