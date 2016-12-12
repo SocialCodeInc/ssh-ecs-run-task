@@ -16,12 +16,13 @@ ADD_VOLUMES=true
 ADD_ENTRYPOINT=false
 OVERRIDING_ENTRYPOINT=false
 SC_DOCKER_TOOLS_DEBUG=${SC_DOCKER_TOOLS_DEBUG:-false}
-OVERRIDDEN_IMAGE=''
 
 CLUSTER=${CLUSTER:-}
 TASK_LIKE=${TASK_LIKE:-}
 CONTAINER=${CONTAINER:-}
 INSTANCE=${INSTANCE:-}
+IMAGE=${IMAGE:-}
+
 
 SSH_USER=${SSH_USER:-}
 SSH_ARGS=()
@@ -105,7 +106,7 @@ exit 0
 							set -x;                         shift;;
 			--sudo)     	SUDO=true;					    shift;;
 			--task)         TASK_LIKE=${2};                 shift 2;;
-			--image)        OVERRIDDEN_IMAGE=${2};          shift 2;;
+			--image)        IMAGE=${2};          			shift 2;;
 			--container)    CONTAINER=${2};                 shift 2;;
 			--instance)     INSTANCE=${2};                  shift 2;;
 			--cluster)      CLUSTER=${2};                   shift 2;;
@@ -185,7 +186,7 @@ exit 0
 
 	[ -z "$container" ] && die "Could not find container: $CONTAINER"
 
-	image=${OVERRIDDEN_IMAGE:-$(echo $container | json .image)}
+	image=${IMAGE:-$(echo $container | json .image)}
 
 	[ -z "$image" ] && die "Could not find image in container $CONTAINER"
 
