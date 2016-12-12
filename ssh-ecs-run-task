@@ -22,6 +22,8 @@ TASK_LIKE=${TASK_LIKE:-}
 CONTAINER=${CONTAINER:-}
 INSTANCE=${INSTANCE:-}
 IMAGE=${IMAGE:-}
+TAG=${TAG:-}
+
 
 
 SSH_USER=${SSH_USER:-}
@@ -53,6 +55,7 @@ $usage
         +e                      do NOT COPY environment variables from the Task
         +v                      do NOT COPY volumes from the Task
         --image <image>         use given image for the task
+        --tag   <tag>           use given tag for the image 
 
 
     Docker Run Options:
@@ -107,6 +110,7 @@ exit 0
             --sudo)         SUDO=true;                         shift;;
             --task)         TASK_LIKE=${2};                    shift 2;;
             --image)        IMAGE=${2};                        shift 2;;
+            --tag)          TAG=${2};                          shift 2;;
             --container)    CONTAINER=${2};                    shift 2;;
             --instance)     INSTANCE=${2};                     shift 2;;
             --cluster)      CLUSTER=${2};                      shift 2;;
@@ -189,6 +193,10 @@ exit 0
     image=${IMAGE:-$(echo $container | json .image)}
 
     [ -z "$image" ] && die "Could not find image in container $CONTAINER"
+
+    if [[ -n ${TAG} ]]; then
+    	image="$(echo $image | cut -d: -f1):${TAG}"
+    fi
 
 #
 # Find an instance in the cluster to run on
