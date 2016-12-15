@@ -145,7 +145,9 @@ You may find these ssh options useful for running batch commands, to avoid some 
 Sometimes things go wrong.  The command you are running may get hung or you may realize that you've run the wrong command, (like  `rm -rf foo /*` instead of `rm -rf foo/*`).  If your container uses (dockerfy)[https://github.com/SocialCodeInc/dockerfy] as its entrypoint, then when you type the ^C aka <ccontrol>C character or kill your ssh,  dockerfy will catch the SIGINT, SIGQUIT, SIGTERM, SIGHUP and shutdown the container.   Without dockerfy, some commands just hang.   How your command reacts depends on how well it handles signals through ssh and docker.   So using dockerfy as the entrypoint is highly recommended.  With dockerfy as the entrypoint, dockerfy runs your command, and listens for signals (which will propagate to your command), and the container will get cleanly shutdown when your command finishes.
 
 ##Permissions
-To run this script you will have to have been granted all necessary permissions.  **It is not a backdoor**, just an easier path to the front door.  So you will need ssh access to the instance, and the account that you use for ssh on the instance will need permission to run the docker command.   Pulling images from public repositories should always work, but to pull images from private repositories on dockerhub the account will also need to be authenticated via `docker login` credentials.   Some systems may rely on `sudo` to limit access and log all calls to the docker command.
+To run this script you will have to have been granted all necessary permissions.  **It is not a backdoor**, just an easier path to the front door.  So you will need ssh access to the instance, and the account that you use for ssh on the instance will need permission to run the docker command.   Pulling images from public repositories should always work, but to pull images from private repositories on dockerhub the account will also need to be authenticated via `docker login` credentials.  
+
+Some systems may rely on `sudo` to limit access and log all calls to the docker command.  In those cases, setup a user account to have permission to run docker and to be authenticated on dockerhub.   You can test this by logging in as the user and trying to run docker commands and pull private images.  If it doesn't work at the shell prompt, its not going to work for ssh-ecs-run-task either.
 
 ### sudo
 On some EC2 instances, you may need sudo privileges to run the docker command.  If so, then use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured on the EC2 instance to give users a limited set of commands to run, and it logs all their actions.  To pass options and arguments to the `sudo` command, prefix the options with `--sudo-` like this:
@@ -156,38 +158,23 @@ to cause ssh-ecs-run-task to invoke the `sudo` command like this:
 
     sudo --user <user> -i -g <group> docker run ....
     
-**ssh-ecs-run-task** knows which options to sudo take arguments, and handles them all correctly.  However, some options such as --shell, --prompt, and --background are forbidden
+**ssh-ecs-run-task** knows which options to sudo take arguments, and handles them all correctly.  However, some options such as --shell, --prompt, and --background are forbidden.  If you use any --sudo-<flag>, then --sudo is implied as well.
 
 ##Caution
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
 
 ###Proper Uses:
-Running tasks where you want or need to see the output directly, such as a database migration. You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`
+Running tasks where you want or need to see the output directly, such as a database migration. You could use even this script to create an interactive django shell to perform ad-hoc maintenance via`ssh-ecs-run-task --task ecscompose-user-registration-service--alpha -- django-admin shell`.  Proper uses:
 
 + interactive django shell
-+ Jenkins builds
++ Jenkins build scripts
 + cron jobs
 + interactive mysql client
 
 ###Improper Uses:
-+ Changing the configuration of the system with temporary fixes that are not factored back into chef or Github.   This is very dangerous – it can leave us with a system that works but cannot be reproduced!
++ Changing the configuration of the system with temporary fixes that are not factored back into chef or Github.   This is very dangerous – it can leave you with a system that works but cannot be reproduced!
 + Any unauthorized access or changes.
 + Relying on this command instead of actually designing your system to have a proper management features.
 
 ## Limitations
-### Running images from private dockerhub repository on a foreign cluster
-
-Accessing a private Dockerhub repository requires Oauth authentication for the docker
-command, which beyond the scope of **ssh-ecs-run-task's** capabilities.
-
-This means that any images from private Dockerhub repositories must already exist on the cluster.  In this case, you may want to build any support software into an image that will always be used by a running container for your cluster instances.
-
-The typical error message will not tell you that this is an authentication issue, instead it will complain that the image is "not found"
-
-   	$ ssh-ecs-run-task --ssh-q --ssh-o StrictHostKeyChecking=no --ssh-o ServerAliveInterval=30 --task ecscompose-user-blogs--staging \
-      --cluster user-registration-service--staging --entrypoint bash
-
-	RUNNING  on user-registration-service-ecs-staging-i-9a13cd03
-	Unable to find image 'myorganization/user-blogs:2.3.1' locally
-	Pulling repository docker.io/myorganization/user-blogs
-	docker: Error: image smyorganization/user-blogs not found.
+The **ssh-ecs-run-task** command relies on **ssh**, **ecs aws**, and **docker**, so it is limited to doing things that you could otherwise manually do, but with more effort.
