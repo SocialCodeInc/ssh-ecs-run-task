@@ -145,10 +145,10 @@ You may find these ssh options useful for running batch commands, to avoid some 
 Sometimes things go wrong.  The command you are running may get hung or you may realize that you've run the wrong command, (like  `rm -rf foo /*` instead of `rm -rf foo/*`).  If your container uses (dockerfy)[https://github.com/SocialCodeInc/dockerfy] as its entrypoint, then when you type the ^C aka <ccontrol>C character or kill your ssh,  dockerfy will catch the SIGINT, SIGQUIT, SIGTERM, SIGHUP and shutdown the container.   Without dockerfy, some commands just hang.   How your command reacts depends on how well it handles signals through ssh and docker.   So using dockerfy as the entrypoint is highly recommended.  With dockerfy as the entrypoint, dockerfy runs your command, and listens for signals (which will propagate to your command), and the container will get cleanly shutdown when your command finishes.
 
 ##Permissions
-To run this script you will have to have been granted all necessary permissions.  It's not a backdoor, just an easier path to the front door.
+To run this script you will have to have been granted all necessary permissions.  **It is not a backdoor**, just an easier path to the front door.  So you will need ssh access to the instance, and the account that you use for ssh on the instance will need permission to run the docker command.   Pulling images from public repositories should always work, but to pull images from private repositories on dockerhub the account will also need to be authenticated via `docker login` credentials.   Some systems may rely on `sudo` to limit access and log all calls to the docker command.
 
 ### sudo
-On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured to give users a limited set of commands to run, and it logs all their actions.  To pass options and arguments to the `sudo` command, prefix the options with `--sudo-` like this:
+On some EC2 instances, you may need sudo privileges to run the docker command.  If so, then use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured on the EC2 instance to give users a limited set of commands to run, and it logs all their actions.  To pass options and arguments to the `sudo` command, prefix the options with `--sudo-` like this:
 
     ssh-ecs-run-task --sudo--user <user> --sudo-i --sudo-g <group> --task <task-name>
     
@@ -156,7 +156,7 @@ to cause ssh-ecs-run-task to invoke the `sudo` command like this:
 
     sudo --user <user> -i -g <group> docker run ....
     
-Long options such as `--user` are expected to take arguments. For those that take no arguments, use the short form. In other words use `-A` instead of `--askpass`.
+**ssh-ecs-run-task** knows which options to sudo take arguments, and handles them all correctly.  However, some options such as --shell, --prompt, and --background are forbidden
 
 ##Caution
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.
