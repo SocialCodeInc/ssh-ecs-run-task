@@ -131,7 +131,7 @@ set -x
                             ssh_option=$(echo $1 | sed 's/--ssh-//')
                             SSH_ARGS+=(-$ssh_option ${2});     shift 2;;
 
-            --sudo-([AbEeHiKklnPSsVv]|-askpass)
+            --sudo-[AbEeHiKklnPSsVv])
                             # sudo options that take no arguments
                             SUDO=true
                             sudo_option=$(echo $1 | sed 's/--sudo-//')
