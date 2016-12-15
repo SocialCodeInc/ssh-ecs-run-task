@@ -85,6 +85,8 @@ The **--help** option will give you the full usage information.   Any options th
         -w|--workdir
         --user <user>
 		--sudo                                       use sudo to run the docker command
+        --sudo-<flag>                                passes -<flag> to the sudo command  
+        --sudo-<flag> <arg>                          passes -<flag> <arg> to the sudo command
 
 	CLUSTER Options:
 		--cluster    <cluster-name>                  cluster on which to run
@@ -125,7 +127,8 @@ For long running batch commands you may want to use the **-o ServerAliveInterval
 
 	$ ssh-ecs-run-task --task ecscompose-user-registration-service--staging --ssh-o ServerAliveInterval=30 -- <some-long-running-command>
 
-**ssh-ecs-run-task** knows which options to ssh take arguments, and handles it all correctly
+**ssh-ecs-run-task** knows which options to ssh take arguments, and handles them all correctly.
+
 
 ###Running Batch Commands
 Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed.
@@ -145,7 +148,15 @@ Sometimes things go wrong.  The command you are running may get hung or you may 
 To run this script you will have to have been granted all necessary permissions.  It's not a backdoor, just an easier path to the front door.
 
 ### sudo
-On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured to give users a limited set of commands to run, and it logs all their actions.
+On some EC2 instances, you may need sudo privileges to run the docker command.  If so, the use the **--sudo** flag to tell ssh-ecs-run-task to use `sudo`.  The `sudo` command can be configured to give users a limited set of commands to run, and it logs all their actions.  To pass options and arguments to the `sudo` command, prefix the options with `--sudo-` like this:
+
+    ssh-ecs-run-task --sudo--user <user> --sudo-i --sudo-g <group> --task <task-name>
+    
+to cause ssh-ecs-run-task to invoke the `sudo` command like this:
+
+    sudo --user <user> -i -g <group> docker run ....
+    
+Long options such as `--user` are expected to take arguments. For those that take no arguments, use the short form. In other words use `-A` instead of `--askpass`.
 
 ##Caution
 As spiderman's uncle once said, "with great power comes great responsibility".  So please don't use this handy tool to wreck your system by running dangerous commands without thinking.

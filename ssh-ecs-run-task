@@ -29,6 +29,7 @@ TAG=${TAG:-}
 SSH_USER=${SSH_USER:-}
 SSH_ARGS=()
 SUDO=${SUDO:-false}
+SUDO_ARGS=()
 
 usage="USAGE: $script_name [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options"
 
@@ -62,9 +63,10 @@ $usage
         should be listed before the -- command
 
         -w|--workdir
-        --user <user>
-        --sudo                                        use sudo to run the docker command itself
-
+        --user <user>                                pass --user <user> thru to the docker command
+        --sudo 		                                 use sudo to run the docker command 
+        --sudo-<flag>                                passes -<flag> to the sudo command  
+        --sudo-<flag> <arg>                          passes -<flag> <arg> to the sudo command
 
 
     CLUSTER Options:
@@ -97,6 +99,8 @@ exit 0
 #
 # Parse options
 #
+
+set -x
     DOCKER_OPTIONS=(--rm)
     while [[ ${1:-} ]]
     do
@@ -126,6 +130,17 @@ exit 0
             --ssh-*)        # ssh options that take an argument
                             ssh_option=$(echo $1 | sed 's/--ssh-//')
                             SSH_ARGS+=(-$ssh_option ${2});     shift 2;;
+
+            --sudo-[AbEeHiKklnPSsVv])
+                            # sudo options that take no arguments
+                            SUDO=true
+                            sudo_option=$(echo $1 | sed 's/--sudo-//')
+                            SUDO_ARGS+=(-$sudo_option);          shift;;
+
+            --sudo-*)        # sudo options that take an argument
+                            SUDO=true
+                            sudo_option=$(echo $1 | sed 's/--sudo-//')
+                            SUDO_ARGS+=(-$sudo_option ${2});     shift 2;;
 
             --entrypoint)
                             # Note the fact that the entrypoint is
@@ -264,10 +279,10 @@ exit 0
 #
 
     [ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
-    $SUDO && SUDO_ARG=sudo
+    $SUDO && SUDO_CMD="sudo ${SUDO_ARGS[@]}"
 
     echo "RUNNING $COMMAND on ${ec2InstanceName}"
     if ${VERBOSE}; then
-        echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+        echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
     fi
-    ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_ARG} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+    ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
