@@ -100,7 +100,6 @@ exit 0
 # Parse options
 #
 
-set -x
     DOCKER_OPTIONS=(--rm)
     while [[ ${1:-} ]]
     do
@@ -131,7 +130,14 @@ set -x
                             ssh_option=$(echo $1 | sed 's/--ssh-//')
                             SSH_ARGS+=(-$ssh_option ${2});     shift 2;;
 
-            --sudo-[AbEeHiKklnPSsVv])
+
+            --sudo--background | --sudo--askpass | --sudo-e | --sudo--edit | --sudo--prompt | --sudo-s | --sudo--shell)
+							# forbid some options such as editing files or alternative SHELLs or prompting
+                            sudo_option=$(echo $1 | sed 's/--sudo-//')
+							echo "Forbidden sudo option: -$sudo_option"
+							exit 1;;
+
+            --sudo-[AbEehHiKklnPSsVv] | --sudo--login | --sudo--shell | --sudo--preserve-env | --sudo--help | --sudo--set-home | --sudo-preserve-groups)
                             # sudo options that take no arguments
                             SUDO=true
                             sudo_option=$(echo $1 | sed 's/--sudo-//')
