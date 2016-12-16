@@ -24,13 +24,13 @@ INSTANCE=${INSTANCE:-}
 IMAGE=${IMAGE:-}
 TAG=${TAG:-}
 DOMAIN=${DOMAIN:-}
-
-
+INTERACTIVE=${INTERACTIVE:-true}
 
 SSH_USER=${SSH_USER:-}
-SSH_ARGS=()
+SSH_OPTIONS=()
 SUDO=${SUDO:-false}
 SUDO_ARGS=()
+DOCKER_OPTIONS=(--rm)
 
 usage="USAGE: $script_name [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options"
 
@@ -50,8 +50,10 @@ $usage
     a new container with settings from the given task.
 
     General Options:
-        --verbose       print verbose output 
-        --debug         print debug output
+        --verbose               print verbose output 
+        --debug                 print debug output
+        --non-interactive       do not pass the -t flag to ssh or the -it flags 
+                                to docker to allocate a tty
 
     DNS Options:
         --domain <domain>       the DNS domain for all EC2 instances
@@ -105,7 +107,6 @@ exit 0
 # Parse options
 #
 
-    DOCKER_OPTIONS=(--rm)
     while [[ ${1:-} ]]
     do
         case "${1:-}" in
@@ -118,6 +119,7 @@ exit 0
             --sudo)         SUDO=true;                         shift;;
             --task)         TASK_LIKE=${2};                    shift 2;;
             --image)        IMAGE=${2};                        shift 2;;
+			--non-interactive)  INTERACTIVE=false;             shift;;
             --tag)          TAG=${2};                          shift 2;;
             --domain)       DOMAIN=${2};                       shift 2;;
             --container)    CONTAINER=${2};                    shift 2;;
@@ -130,11 +132,11 @@ exit 0
             --ssh-[1246AaCfGgKkMNnqsTtVvXxYy])
                             # ssh options that take no arguments
                             ssh_option=$(echo $1 | sed 's/--ssh-//')
-                            SSH_ARGS+=(-$ssh_option);          shift;;
+                            SSH_OPTIONS+=(-$ssh_option);          shift;;
 
             --ssh-*)        # ssh options that take an argument
                             ssh_option=$(echo $1 | sed 's/--ssh-//')
-                            SSH_ARGS+=(-$ssh_option ${2});     shift 2;;
+                            SSH_OPTIONS+=(-$ssh_option ${2});     shift 2;;
 
 
             --sudo--background | --sudo--askpass | --sudo-e | --sudo--edit | --sudo--prompt | --sudo-s | --sudo--shell)
@@ -167,6 +169,11 @@ exit 0
                             DOCKER_OPTIONS+=($1);              shift;;
         esac
     done
+
+    if $INTERACTIVE; then
+    	DOCKER_OPTIONS+=('-it')
+    	SSH_OPTIONS+=('-t')
+    fi
 
     # remaining args are the command and its options
     COMMAND="$*"
@@ -295,6 +302,9 @@ exit 0
 
     echo "RUNNING $COMMAND on ${ec2InstanceName}"
     if ${VERBOSE}; then
-        echo ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+        echo ssh  "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
     fi
-    ssh -t "${SSH_ARGS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run -it "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+
+    # NOTE:  DOCKER_OPTIONS comes AFTER ENV_ARGS and VOLUME_ARGS, so the DOCKER_OPTIONS
+    #        can be used to override ENV_ARGS that we inherited from the task
+    ssh "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
