@@ -119,7 +119,7 @@ exit 0
             --sudo)         SUDO=true;                         shift;;
             --task)         TASK_LIKE=${2};                    shift 2;;
             --image)        IMAGE=${2};                        shift 2;;
-			--non-interactive)  INTERACTIVE=false;             shift;;
+            --non-interactive)  INTERACTIVE=false;             shift;;
             --tag)          TAG=${2};                          shift 2;;
             --domain)       DOMAIN=${2};                       shift 2;;
             --container)    CONTAINER=${2};                    shift 2;;
