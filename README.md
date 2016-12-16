@@ -70,37 +70,50 @@ Finally, notice that when we exited successfully and that the exit code **0** wa
 **ssh-ecs-run-task** requires you to pre-install ecs-cli-0.4.x or higher and the [json tool](https://github.com/trentm/json) version 9.0.3 or higher
 
 ## Usage
-The **--help** option will give you the full usage information.   Any options that are not recognized by `ssh-ecs-run-task` will be passed through to the `docker run` command
+    USAGE: ssh-ecs-run-task [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options
 
-	USAGE: ssh-ecs-run-task [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options
-	Outputs command-line options and image for use with `docker run` to run
-	a new container with settings from the given task.
+    Outputs command-line options and image for use with `docker run` to run
+    a new container with settings from the given task.
 
-	TASK_LIKE Options:
-		+e              do NOT COPY environment variables from the Task
-		+v              do NOT COPY volumes from the Task
+    General Options:
+        --verbose       print verbose output 
+        --debug         print debug output
 
-	Docker Run Options:
-		should be listed before the -- command
+    DNS Options:
+        --domain <domain>       the DNS domain for all EC2 instance names
+
+
+    TASK_LIKE Options:
+        +e                      do NOT COPY environment variables from the Task
+        +v                      do NOT COPY volumes from the Task
+        --image <image>         use given image for the task
+        --tag   <tag>           use given tag for the image 
+
+
+    Docker Run Options:
+        should be listed before the -- command
+
         -w|--workdir
-        --user <user>
-		--sudo                                       use sudo to run the docker command
+        --user <user>                                pass --user <user> thru to the docker command
+        --sudo 		                                 use sudo to run the docker command 
         --sudo-<flag>                                passes -<flag> to the sudo command  
         --sudo-<flag> <arg>                          passes -<flag> <arg> to the sudo command
 
-	CLUSTER Options:
-		--cluster    <cluster-name>                  cluster on which to run
-		--task       <task-name>                     AWS task definition name to mimic
-		--container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
-		--instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
 
-	SSH Options:
-		--ssh-user   <user>                          defaults to your current ssh config
-		--ssh-<flag>                                 passes -<flag> to the ssh command
-		--ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
+    CLUSTER Options:
+        --cluster    <cluster-name>                  cluster on which to run
+        --task       <task-name>                     AWS task definition name to mimic
+        --container  <container-name or index>       name or index of container in task (defaults to 0 for the first)
+        --instance   <instance-id or index>          name or index of EC2 instance in cluster (defaults to -1 for random)
 
-	ssh-ecs-run-task inspects the container in the task to determine its environment,
-	volumes and image, ssh's to the chosen instance and runs the command in a new container
+    SSH Options:
+        --ssh-user   <user>                          defaults to your current ssh config
+        --ssh-<flag>                                 passes -<flag> to the ssh command
+        --ssh-<flag> <arg>                           passes -<flag> <arg> to the ssh command
+
+
+
+ssh-ecs-run-task inspects the container in the task to determine its environment, volumes and image, ssh's to the chosen instance and runs the command in a new container
 
 ##Examples
 + Run a bash shell inside a container.  `ssh-ecs-run-task --task ecscompose-user-registration-service--alpha – bash`
