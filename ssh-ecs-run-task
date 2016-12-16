@@ -23,6 +23,7 @@ CONTAINER=${CONTAINER:-}
 INSTANCE=${INSTANCE:-}
 IMAGE=${IMAGE:-}
 TAG=${TAG:-}
+DOMAIN=${DOMAIN:-}
 
 
 
@@ -51,6 +52,10 @@ $usage
     General Options:
         --verbose       print verbose output 
         --debug         print debug output
+
+    DNS Options:
+        --domain <domain>       the DNS domain for all EC2 instances
+
 
     TASK_LIKE Options:
         +e                      do NOT COPY environment variables from the Task
@@ -114,6 +119,7 @@ exit 0
             --task)         TASK_LIKE=${2};                    shift 2;;
             --image)        IMAGE=${2};                        shift 2;;
             --tag)          TAG=${2};                          shift 2;;
+            --domain)       DOMAIN=${2};                       shift 2;;
             --container)    CONTAINER=${2};                    shift 2;;
             --instance)     INSTANCE=${2};                     shift 2;;
             --cluster)      CLUSTER=${2};                      shift 2;;
@@ -188,7 +194,6 @@ exit 0
             cat
         }
     fi
-
     $SC_DOCKER_TOOLS_DEBUG && set -x
 
 
@@ -252,6 +257,7 @@ exit 0
     done
 
     [ -z "$ec2InstanceName" ] && die "Could not find instance $INSTANCE"
+    [[ -n ${DOMAIN} ]] && ec2InstanceName+=".${DOMAIN}"
 
     if $ADD_ENV; then
         ENV_ARGS=()
