@@ -186,7 +186,7 @@ exit 0
     fi
 
     [ -z "$CLUSTER" ] && die "--cluster is a required option"
-    echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*)$" ||
+    echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*|safezone.*)$" ||
         die "Invalid cluster: $CLUSTER"
 
     [ -z "$CONTAINER" ] && CONTAINER=0
