@@ -185,9 +185,7 @@ exit 0
         CLUSTER=$(echo $TASK_LIKE | sed -e 's/^ecscompose-//')
     fi
 
-    [ -z "$CLUSTER" ] && die "--cluster is a required option"
-    echo $CLUSTER | egrep -q -- "--(alpha|staging|local|production|qa.*|safezone.*)$" ||
-        die "Invalid cluster: $CLUSTER"
+    [ -z "$CLUSTER" ] && die "Could not determine cluster.  Use the --cluster option"
 
     [ -z "$CONTAINER" ] && CONTAINER=0
 
@@ -216,7 +214,7 @@ exit 0
 #
     case $CONTAINER in
     [0-9]*)       container=$(echo $task_def | json ".taskDefinition.containerDefinitions[$CONTAINER]");;
-    [a-zA-Z].*)   container=$(echo $task_def | json .taskDefinition.containerDefinitions |
+    [a-zA-Z\-\_]*)   container=$(echo $task_def | json .taskDefinition.containerDefinitions |
                               json -c "this.name == '$CONTAINER'" | json -a);;
     *)            die "unrecognized container: $CONTAINER"
     esac
