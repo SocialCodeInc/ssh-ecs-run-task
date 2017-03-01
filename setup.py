@@ -72,7 +72,9 @@ setup(
     install_requires=['PyYAML', 'awscli>1.10.53'],
     packages=find_packages(),
     scripts=[
+        'ssh-ecs-log-task',
         'ssh-ecs-run-task',
+        'ssh-ecs-stats-task',
     ],
     entry_points={
         'console_scripts': [],

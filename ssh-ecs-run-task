@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 ###############################################################################
-# Print -e and -v options for use with the docker command pulling the         #
-# environment and volumes from the given container in the desired task        #
+# Start a new container with the image, environment and settings 
+# from a given task.  (Or find a running container and print its logs)
 ###############################################################################
 
 #set -eou pipefail # see https://coderwall.com/p/fkfaqq/safer-bash-scripts-with-set-euxo-pipefail
@@ -11,8 +11,8 @@ set -eo pipefail
 script_name=$(basename $0)
 
 VERBOSE=false
-ADD_ENV=true
-ADD_VOLUMES=true
+ADD_ENV=false
+ADD_VOLUMES=false
 ADD_ENTRYPOINT=false
 OVERRIDING_ENTRYPOINT=false
 SC_DOCKER_TOOLS_DEBUG=${SC_DOCKER_TOOLS_DEBUG:-false}
@@ -30,7 +30,23 @@ SSH_USER=${SSH_USER:-}
 SSH_OPTIONS=()
 SUDO=${SUDO:-false}
 SUDO_ARGS=()
-DOCKER_OPTIONS=(--rm)
+DOCKER_COMMAND=run
+DOCKER_OPTIONS=()
+
+case $script_name in 
+    ssh-ecs-log-task)           
+                                DOCKER_COMMAND=log
+                                INTERACTIVE=false
+                                SSH_OPTIONS=(-q -o StrictHostKeyChecking=no);;
+    ssh-ecs-stats-task)           
+                                DOCKER_COMMAND=stats
+                                INTERACTIVE=false
+                                SSH_OPTIONS=(-q -o StrictHostKeyChecking=no);;
+    ssh-ecs-run-task)
+                                DOCKER_COMMAND=run
+                                ADD_ENV=true
+                                ADD_VOLUMES=true;;
+esac
 
 usage="USAGE: $script_name [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options"
 
@@ -69,6 +85,7 @@ $usage
     Docker Run Options:
         should be listed before the -- command
 
+        --command <cmd>                              docker command to run, defaults to '$DOCKER_COMMAND'
         -w|--workdir
         --user <user>                                pass --user <user> thru to the docker command
         --sudo 		                                 use sudo to run the docker command 
@@ -119,12 +136,14 @@ exit 0
             --sudo)         SUDO=true;                         shift;;
             --task)         TASK_LIKE=${2};                    shift 2;;
             --image)        IMAGE=${2};                        shift 2;;
+            --interactive)  INTERACTIVE=true;                  shift;;
             --non-interactive)  INTERACTIVE=false;             shift;;
             --tag)          TAG=${2};                          shift 2;;
             --domain)       DOMAIN=${2};                       shift 2;;
             --container)    CONTAINER=${2};                    shift 2;;
             --instance)     INSTANCE=${2};                     shift 2;;
             --cluster)      CLUSTER=${2};                      shift 2;;
+            --command)      DOCKER_COMMAND=${2};               shift 2;;
 
             # prefix all ssh options with --ssh
             --ssh-user)     SSH_USER=${2};                     shift 2;;
@@ -170,15 +189,22 @@ exit 0
         esac
     done
 
-    if $INTERACTIVE; then
-    	DOCKER_OPTIONS+=('-it')
-    	SSH_OPTIONS+=('-t')
-    fi
 
     # remaining args are the command and its options
     COMMAND="$*"
 
-    [ -n "$COMMAND" ] || $OVERRIDING_ENTRYPOINT || die "no command specified"
+    if [[ $DOCKER_COMMAND == run ]]; then
+        [ -n "$COMMAND" ] || $OVERRIDING_ENTRYPOINT || die "no command specified"
+        # be sure to remove the new container when it exits
+        DOCKER_OPTIONS+=('--rm')
+        if $INTERACTIVE; then
+            DOCKER_OPTIONS+=('-it')
+            SSH_OPTIONS+=('-t')
+        fi
+    else
+        ADD_ENV=false
+        ADD_VOLUMES=false
+    fi
     [ -z "$TASK_LIKE" ] && die "--task is a required option"
 
     if [ -z "$CLUSTER" ]; then
@@ -208,6 +234,28 @@ exit 0
 
     task_def=$(aws ecs describe-task-definition --task-definition $TASK_LIKE) || exit 1
 
+    if [[ $DOCKER_COMMAND != run ]]; then
+        #
+        # find an instance where the task is running, or stopped.
+        #
+        task_def_arn=$(echo $task_def | json .taskDefinition.taskDefinitionArn)
+        task_desc=''
+        for desiredStatus in RUNNING STOPPED
+        do
+            [ -n "$task_desc" ] && continue
+            for task in $(aws ecs list-tasks --cluster $CLUSTER --desired-status $desiredStatus |
+                          json  .taskArns | json -a)
+            do
+                task_desc=$(aws ecs describe-tasks --cluster $CLUSTER --task $task |
+                           json '.tasks[0]' | json -c 'this.taskDefinitionArn="$task_def_arn"')
+
+                [ -n "$task_desc" ] && continue
+            done
+        done
+        [ -z "$task_desc" ] && die "Could not find a running or stopped task"
+        instance_arns=$(echo $task_desc | json .containerInstanceArn)
+        [[ -z $instance_arns ]] && die "Could not find a RUNNING or STOPPED task"
+    fi
 
 #
 # Find the container w/in the task and get information
@@ -229,17 +277,21 @@ exit 0
     	image="$(echo $image | cut -d: -f1):${TAG}"
     fi
 
-#
-# Find an instance in the cluster to run on
-#
-    instance_index=0
-    instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
-                      json  .containerInstanceArns  | json -a | shuffle)
-    if [ -z "$instance_arns" ]; then
-        if aws ecs list-clusters | json .clusterArns | json -a | egrep -q ".*:cluster/${CLUSTER}$"; then
-            die "Cluster '$CLUSTER' has no instances"
-        else
-            die "Invalid cluster: $CLUSTER"
+    container_name=$(echo $container | json .name)
+
+    if [[ $DOCKER_COMMAND != log ]]; then
+        #
+        # Find an instance in the cluster to run $DOCKER_COMMAND on
+        #
+        instance_index=0
+        instance_arns=$(aws ecs list-container-instances --cluster $CLUSTER|
+                          json  .containerInstanceArns  | json -a | shuffle)
+        if [ -z "$instance_arns" ]; then
+            if aws ecs list-clusters | json .clusterArns | json -a | egrep -q ".*:cluster/${CLUSTER}$"; then
+                die "Cluster '$CLUSTER' has no instances"
+            else
+                die "Invalid cluster: $CLUSTER"
+            fi
         fi
     fi
 
@@ -298,11 +350,20 @@ exit 0
     [ -n "$SSH_USER" ] && SSH_USER_ARG="$SSH_USER@"
     $SUDO && SUDO_CMD="sudo ${SUDO_ARGS[@]}"
 
-    echo "RUNNING $COMMAND on ${ec2InstanceName}"
-    if ${VERBOSE}; then
-        echo ssh  "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+    if [[ $DOCKER_COMMAND == log ]]; then
+        echo "LOGS from container ${container_name} on ${ec2InstanceName}"
+        ssh "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} "docker ps -a --filter 'name=$container_name' --format {{.ID}} | head -1 | xargs ${SUDO_CMD} docker logs ${DOCKER_OPTIONS[@]}"
+        exit
+    elif [[ $DOCKER_COMMAND == run ]]; then
+        echo "RUNNING $COMMAND on ${ec2InstanceName}"
+        if ${VERBOSE}; then
+            echo ssh  "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker $DOCKER_COMMAND  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+        fi
+
+        # NOTE:  DOCKER_OPTIONS comes AFTER ENV_ARGS and VOLUME_ARGS, so the DOCKER_OPTIONS
+        #        can be used to override ENV_ARGS that we inherited from the task
+        ssh "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker $DOCKER_COMMAND  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
+    else
+        ssh "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker $DOCKER_COMMAND "${DOCKER_OPTIONS[@]}"
     fi
 
-    # NOTE:  DOCKER_OPTIONS comes AFTER ENV_ARGS and VOLUME_ARGS, so the DOCKER_OPTIONS
-    #        can be used to override ENV_ARGS that we inherited from the task
-    ssh "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} ${SUDO_CMD} docker run  "${ENV_ARGS[@]}"  "${VOLUME_ARGS[@]}" "${DOCKER_OPTIONS[@]}" $image "$COMMAND"
