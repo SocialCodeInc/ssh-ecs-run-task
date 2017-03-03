@@ -142,6 +142,10 @@ For long running batch commands you may want to use the **-o ServerAliveInterval
 
 **ssh-ecs-run-task** knows which options to ssh take arguments, and handles them all correctly.
 
+###Passing options to the `docker run` command
+All other options that appear before the double-dash '**--**' will will pass thru to the docker run command. 
+
+    $ ssh-ecs-run-task --task ecscompose-user-registration-service--staging --add-host regsvc.com:127.0.0.1 -- <some command to start an http server>
 
 ###Running Batch Commands
 Batch commands that never prompt for input, will run to completion and **ssh-ecs-run-task** will stop and remove the container and terminate the ssh connection.  So you can use it in Jenkins scripts, cron jobs and other non-interactive use-cases where you want to capture the output and know if the command succeeded or failed.
