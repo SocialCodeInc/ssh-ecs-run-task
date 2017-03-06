@@ -67,7 +67,7 @@ Finally, notice that when we exited successfully and that the exit code **0** wa
 + `pip install ssh-ecs-run-task`
 + or clone this git repository and run `make install-global`
 
-**ssh-ecs-run-task** requires you to pre-install ecs-cli-0.4.x or higher and the [json tool](https://github.com/trentm/json) version 9.0.3 or higher
+**ssh-ecs-run-task** requires you to pre-install [ecs-cli-0.4.x or higher](http://docs.aws.amazon.com/AmazonECS/latest/developerguide/ECS_CLI_installation.html) and the [json tool](https://github.com/trentm/json) version 9.0.3 or higher
 
 ## Usage
     USAGE: ssh-ecs-run-task [+e +v] --cluster <cluster-name> --task <task-name> --container <container-name> [docker options] -- command and options
