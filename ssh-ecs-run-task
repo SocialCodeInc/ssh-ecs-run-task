@@ -338,7 +338,7 @@ exit 0
             VOLUME_ARGS+=(-v)
             VOLUME_ARGS+=("'$volume_arg'")
         done < <(echo $container | json -a .mountPoints |
-                    json -e "this.volumes=$task_volumes; this.volume_arg = this.containerPath + ':' + this.volumes[this.sourceVolume]" |
+                    json -e "this.volumes=$task_volumes; this.volume_arg = this.volumes[this.sourceVolume] + ':' + this.containerPath" |
                     json -a .volume_arg)
     fi
 
