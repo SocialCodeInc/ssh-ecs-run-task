@@ -328,11 +328,18 @@ exit 0
     fi
 
     if $ADD_VOLUMES; then
+        # Invert task_volumes into a dictionary of {"volume": "path", ...}.
         VOLUME_ARGS=()
-        # invert task_volumes into a dictionary of "volume name --> sourcePath"
-        task_volumes=$(echo $task_def | json .taskDefinition.volumes |
-                       json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name" | json -a)
-        [ -z "$task_volumes" ]  && task_volumes='{}'
+        # e.g. [ { "host": { "sourcePath": "/secrets" }, "name": "volume-0" }, { "host": { "sourcePath": "/etc/socialcode/tls" }, "name": "volume-1" } ]
+        task_volumes=$(echo $task_def | json .taskDefinition.volumes)
+        # e.g. [ { "volume-0": "/secrets" }, { "volume-1": "/etc/socialcode/tls" } ]
+        task_volumes=$(echo $task_volumes | json -e "this[this.name] = this.host.sourcePath; delete this.host; delete this.name")
+        # e.g. { "volume-0": "/secrets", "volume-1": "/etc/socialcode/tls" }
+        task_volumes=$(echo $task_volumes | json -a | json --merge)
+
+        # Handle no volumes case.
+        [ -z "$task_volumes" ] && task_volumes='{}'
+
         while read volume_arg
         do
             VOLUME_ARGS+=(-v)
@@ -341,7 +348,6 @@ exit 0
                     json -e "this.volumes=$task_volumes; this.volume_arg = this.volumes[this.sourceVolume] + ':' + this.containerPath" |
                     json -a .volume_arg)
     fi
-
 
 #
 # RUN IT !!
