@@ -76,11 +76,13 @@ Finally, notice that when we exited successfully and that the exit code **0** wa
     a new container with settings from the given task.
 
     General Options:
-        --verbose       print verbose output 
-        --debug         print debug output
+        --verbose               print verbose output
+        --debug                 print debug output
+        --non-interactive       do not pass the -t flag to ssh or the -it flags
+                                to docker to allocate a tty
 
     DNS Options:
-        --domain <domain>       the DNS domain for all EC2 instance names
+        --domain <domain>       the DNS domain for all EC2 instances
 
 
     TASK_LIKE Options:
