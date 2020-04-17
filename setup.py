@@ -33,7 +33,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
             #print("version = '%s'" % version)
             m = re.match(r"[^0-9]*(?P<XYZ>\b[0-9]+\.[0-9\.]+)(?P<suffix>(\-[^\s]+|))\b", version)
             if not m:
-                print "Unrecognized format for version string %s" % version
+                print("Unrecognized format for version string %s" % version)
 
             XYZ = m.group('XYZ')
 
@@ -47,15 +47,14 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
                         if exit:
                             sys.exit("You must upgrade %s to %s or higher" % (executable_name, min_version))
                         else:
-                            print("WARNING: you should upgrade %s to %s or higher" % (executable_name, min_version))
+                            print(("WARNING: you should upgrade %s to %s or higher" % (executable_name, min_version)))
             if suffix and version.find(suffix) == -1:
                 sys.exit("Suffix %s was not found in version %s" % (suffix, version))
 
 
 
 if __name__ == '__main__':
-    print('Running setup.py for ssh-ecs-run-task version %s'
-          % VERSION)
+    print('Running setup.py for ssh-ecs-run-task version %s' % VERSION)
     # verify_dependency('ecs-cli', '0.4')
     verify_dependency('json', '9.0')
 
