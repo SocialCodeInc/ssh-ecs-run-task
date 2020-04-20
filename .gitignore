@@ -2,5 +2,6 @@
 build/
 dist/
 ssh_ecs_run_task.egg-info/
+.DS_Store
 venv/
 .vscode

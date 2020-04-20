@@ -9,7 +9,8 @@ import re
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
-VERSION = subprocess.check_output("git describe --tags --match '[0-9]*'", shell=True).strip()
+VERSION_BYTES = subprocess.check_output("git describe --tags --match '[0-9]*'", shell=True).strip()
+VERSION = str(VERSION_BYTES)
 
 
 def verify_dependency(executable_name, min_version=None, suffix=None):
@@ -23,9 +24,11 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
         if min_version or suffix:
             executable = os.path.abspath(executable)
             try:
-                version = subprocess.check_output("%s --version" % executable,  stderr=None, shell=True).strip()
+                version_bytes = subprocess.check_output("%s --version" % executable,  stderr=None, shell=True).strip()
             except:
                 sys.exit("Could not determine version of %s" % executable_name)
+
+            version = str(version_bytes)
 
             if version == '':
                 sys.exit("Could not determine version of %s" % executable_name)
@@ -47,7 +50,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
                         if exit:
                             sys.exit("You must upgrade %s to %s or higher" % (executable_name, min_version))
                         else:
-                            print(("WARNING: you should upgrade %s to %s or higher" % (executable_name, min_version)))
+                            print("WARNING: you should upgrade %s to %s or higher" % (executable_name, min_version))
             if suffix and version.find(suffix) == -1:
                 sys.exit("Suffix %s was not found in version %s" % (suffix, version))
 
