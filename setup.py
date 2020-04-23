@@ -10,7 +10,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
 VERSION_BYTES = subprocess.check_output("git describe --tags --match '[0-9]*'", shell=True).strip()
-VERSION = str(VERSION_BYTES)
+VERSION = VERSION_BYTES.decode()
 
 
 def verify_dependency(executable_name, min_version=None, suffix=None):
@@ -28,7 +28,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
             except:
                 sys.exit("Could not determine version of %s" % executable_name)
 
-            version = str(version_bytes)
+            version = version_bytes.decode()
 
             if version == '':
                 sys.exit("Could not determine version of %s" % executable_name)
