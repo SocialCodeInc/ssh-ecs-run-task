@@ -64,6 +64,7 @@ Also notice that the environment variables such as $DATABASE_NAME have all been 
 Finally, notice that when we exited successfully and that the exit code **0** was set in shell **$?** variable, so we can tell that the command succeeded.
 
 ## Installation
++ Install Python 2 or Python 3.
 + `pip install ssh-ecs-run-task`
 + or clone this git repository and run `make install-global`
 

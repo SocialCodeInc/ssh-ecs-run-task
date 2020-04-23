@@ -9,7 +9,8 @@ import re
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 CHANGES = open(os.path.join(here, 'CHANGES.md')).read()
-VERSION = subprocess.check_output("git describe --tags --match '[0-9]*'", shell=True).strip()
+VERSION_BYTES = subprocess.check_output("git describe --tags --match '[0-9]*'", shell=True).strip()
+VERSION = str(VERSION_BYTES)
 
 
 def verify_dependency(executable_name, min_version=None, suffix=None):
@@ -23,9 +24,11 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
         if min_version or suffix:
             executable = os.path.abspath(executable)
             try:
-                version = subprocess.check_output("%s --version" % executable,  stderr=None, shell=True).strip()
+                version_bytes = subprocess.check_output("%s --version" % executable,  stderr=None, shell=True).strip()
             except:
                 sys.exit("Could not determine version of %s" % executable_name)
+
+            version = str(version_bytes)
 
             if version == '':
                 sys.exit("Could not determine version of %s" % executable_name)
@@ -33,7 +36,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
             #print("version = '%s'" % version)
             m = re.match(r"[^0-9]*(?P<XYZ>\b[0-9]+\.[0-9\.]+)(?P<suffix>(\-[^\s]+|))\b", version)
             if not m:
-                print "Unrecognized format for version string %s" % version
+                print("Unrecognized format for version string %s" % version)
 
             XYZ = m.group('XYZ')
 
@@ -54,8 +57,7 @@ def verify_dependency(executable_name, min_version=None, suffix=None):
 
 
 if __name__ == '__main__':
-    print('Running setup.py for ssh-ecs-run-task version %s'
-          % VERSION)
+    print('Running setup.py for ssh-ecs-run-task version %s' % VERSION)
     # verify_dependency('ecs-cli', '0.4')
     verify_dependency('json', '9.0')
 

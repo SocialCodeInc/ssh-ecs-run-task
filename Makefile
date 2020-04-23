@@ -4,7 +4,7 @@ TAG  := $(shell git describe --tags --match '[0-9]*\.[0-9]*')
 all: ssh-ecs-run-task
 
 venv:
-	virtualenv venv
+	virtualenv venv || python3 -m venv venv
 	. venv/bin/activate && pip install -U pip wheel && pip install -r requirements.txt
 	touch venv
 
@@ -54,4 +54,5 @@ test: is-open-source-clean ssh-ecs-run-task-whl
 publish: is-open-source-clean is-clean-z-release ssh-ecs-run-task-whl
 	hub release create -a dist/*-$(TAG)*.whl -m'$(TAG)' $(TAG)
 
-
+clean:
+	rm -Rf venv
