@@ -304,6 +304,10 @@ exit 0
         ec2InstanceName=$(aws ec2 describe-instances  --instance-ids $ec2InstanceId |
                             json .Reservations | json -a .Instances | json -a .Tags |
                             json -c 'this.Key == "Name";' | json -a .Value)
+
+        ec2InstanceIp=$(aws ec2 describe-instances  --instance-ids $ec2InstanceId |
+                          json .Reservations | json -a .Instances | json -a PrivateIpAddress)
+
         [ -n "$ec2InstanceName" ] || die "Could not find an ec2InstanceName"
 
         if (($instance_index == $INSTANCE)) 2>/dev/null || [[ $ec2InstanceName =~ $INSTANCE ]]; then
@@ -315,6 +319,13 @@ exit 0
 
     [ -z "$ec2InstanceName" ] && die "Could not find instance $INSTANCE"
     [[ -n ${DOMAIN} ]] && ec2InstanceName+=".${DOMAIN}"
+
+    # test ssh connection with ec2InstanceName
+    # failover to using ec2InstanceIp
+    sshTest=$(ssh -q -o ConnectTimeout=5 "${SSH_OPTIONS[@]}" ${SSH_USER_ARG}${ec2InstanceName} 'whoami') || true
+    if [[ -z ${sshTest} ]]; then
+        ec2InstanceName=${ec2InstanceIp}
+    fi
 
     if $ADD_ENV; then
         ENV_ARGS=()
